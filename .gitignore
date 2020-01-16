@@ -1,10 +1,10 @@
 # vscode
 .vscode/
 
-*.ipynb
 
 # data folder
 data/
+bbc/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

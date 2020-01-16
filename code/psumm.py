@@ -11,9 +11,10 @@
 
 from collections import namedtuple
 from copy import deepcopy
+from eval_metric import rouge_score
 from functools import partial
+from lexrank import LexRank
 import math
-from metrics import rouge_score
 from nltk.tokenize import word_tokenize
 from nltk.stem import PorterStemmer
 import numpy as np
@@ -23,6 +24,7 @@ from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.feature_selection import chi2, mutual_info_classif
 from sklearn.preprocessing import LabelBinarizer
 from string import punctuation
+from summa.summarizer import summarize as textrank_f
 from sumy.parsers.plaintext import PlaintextParser
 from sumy.summarizers.kl import KLSummarizer
 from sumy.summarizers.lsa import LsaSummarizer
@@ -55,6 +57,25 @@ def preprocess_sentence(sentence, remove_stop=True, stem=True):
         tokens = map(PorterStemmer().stem, tokens)
     
     return " ".join(tokens)
+
+
+class TextRank(Summarizer):
+
+    def summarize(self, sentences):
+        return textrank_f(". ".join(sentences), words=120)
+
+class LexRank(Summarizer):
+
+    def __init__(self):
+        documents = [
+            file_path.open(mode='rt', encoding='utf-8').readlines()
+            for file_path in Path("../bbc/tech").glob("*.txt")
+        ]
+        self.lxr = LexRank(documents)
+
+    def summarize(self, sentences):
+        return self.lxr.get_summary(sentences, summary_size=5)
+    
 
 
 class Summarizer:
