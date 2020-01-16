@@ -11,11 +11,7 @@
 
 from rouge import Rouge
 
-def rouge_score(reference, hypothesis, rouge_type : str):
+def rouge_score(reference, hypothesis, rouge_type=None):
     rouge = Rouge()
     scores = rouge.get_scores(hypothesis, reference)
-
-    # rouge-1, rouge-2, rouge-l
-    # "r", "p", "f"
-    #print(scores)
-    return scores[0][f"rouge-{rouge_type}"]["r"]
+    return scores[0]

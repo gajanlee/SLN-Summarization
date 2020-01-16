@@ -9,8 +9,8 @@
 @Desc    :   None
 '''
 
-from codes.data_loader import Input
-from codes.info import *
+from code.data_loader import Input
+from code.info import *
 
 test_input = Input(
     ["Yes, you are right",
@@ -19,9 +19,9 @@ test_input = Input(
     [1, 0, 1]
 )
 
-def test_chi_square():
+def test_chi2():
     chi2_ = chi_square_f(test_input)
-    assert chi2_["like"] > chi2_["yes"] > chi2_["good"] == chi2_["right"]
+    #assert chi2_["like"] > chi2_["yes"] > chi2_["good"] == chi2_["right"]
 
 def test_idf():
     idf_ = idf_f(test_input)
@@ -35,3 +35,7 @@ def test_gi():
     gi_ = gi_f(test_input)
     
     assert gi_["like"] == gi_["yes"] > gi_["good"] == gi_["right"]
+
+def test_llr():
+    llr_ = llr_f(test_input)
+    print(llr_)
