@@ -1,0 +1,9 @@
+nltk==3.4.5
+lxml==4.5.0
+rouge==0.3.2
+lexrank==0.1.0
+sklearn
+summa==1.2.0
+sumy==0.8.1
+flask
+pyrouge

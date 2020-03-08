@@ -15,6 +15,7 @@ from eval_metric import rouge_score
 from functools import partial
 from lexrank import LexRank
 import math
+import nltk
 from nltk.tokenize import word_tokenize
 from nltk.stem import PorterStemmer
 import numpy as np
@@ -33,9 +34,9 @@ from sumy.summarizers.reduction import ReductionSummarizer  # Graph-Rank with ne
 from sumy.nlp.tokenizers import Tokenizer as STokenizer
 
 
-STOP_TOKENS = set(Path("/home/lee/workspace/summarization/res/stopwords.txt").read_text().split("\n") + list(punctuation))
+STOP_TOKENS = set(Path("/home/lee/workspace/projects/SLN-Summarization/res/stopwords.txt").read_text().split("\n") + list(punctuation))
 
-RE_SENTENCE = re.compile('(\S.+?[.!?])(?=\s+|$)|(\S.+?)(?=[\n]|$)')
+RE_SENTENCE = re.compile('(\S.+?[.!?`])(?=\s+|$)|(\S.+?)(?=[\n]|$)')
 
 Input = namedtuple("Input", ["data", "target"])
 Score = namedtuple("Score", ["content", "score"])
@@ -43,10 +44,11 @@ EvalS = namedtuple("EvalS", ["precision", "recall", "fscore"])
 
 def preprocess_section(section, *args, **kwargs):
     return [preprocess_sentence(match.group(), *args, **kwargs) 
-        for match in RE_SENTENCE.finditer(section)]
+        for match in RE_SENTENCE.finditer(section.replace(".", ". "))]
 
-def preprocess_sentence(sentence, remove_stop=True, stem=True):
+def preprocess_sentence(sentence, remove_stop=False, stem=False):
     sentence = sentence.lower()
+    sentence = sentence.replace("\n", "").replace("`", "").replace("'", "").strip()
     tokens = word_tokenize(sentence)
 
     if remove_stop:
@@ -58,30 +60,19 @@ def preprocess_sentence(sentence, remove_stop=True, stem=True):
     
     return " ".join(tokens)
 
-
-class TextRank(Summarizer):
-
-    def summarize(self, sentences):
-        return textrank_f(". ".join(sentences), words=120)
-
-class LexRank(Summarizer):
+class Summarizer:
 
     def __init__(self):
+        self._info_F = InfoF()
+
         documents = [
             file_path.open(mode='rt', encoding='utf-8').readlines()
-            for file_path in Path("../bbc/tech").glob("*.txt")
+            for file_path in Path("/media/lee/辽东铁骑/codes/summarization/bbc/tech").glob("*.txt")
         ]
         self.lxr = LexRank(documents)
 
     def summarize(self, sentences):
         return self.lxr.get_summary(sentences, summary_size=5)
-    
-
-
-class Summarizer:
-
-    def __init__(self):
-        self._info_F = InfoF()
     
 
     def _centroid_sentence_scores(self, sentences, tok_importance):
@@ -164,11 +155,6 @@ class Summarizer:
 
         
         return summarys
-                
-
-
-
-
 
     def _summ_centroid_prob(self, introduction, section, conclusion,
                     tok_importance, summary_size):
@@ -189,8 +175,15 @@ class Summarizer:
         return summarys
 
 
+    def _summ_textrank(self, sentences, summary_size=5):
+        return textrank_f(sentences, words=summary_size*40)
+
+    def _summ_lexrank(self, sentences, summary_size=5):
+        return self.lxr.get_summary(sentences.split(". "), summary_size)
+
+
     def _summ_kl(self, *args, **kwargs):
-        return self._summy_funcs(LsaSummarizer, *args, **kwargs)
+        return self._summy_funcs(KLSummarizer, *args, **kwargs)
 
     def _summ_lsa(self, *args, **kwargs):
         return self._summy_funcs(LsaSummarizer, *args, **kwargs)
@@ -201,11 +194,26 @@ class Summarizer:
     def _summ_reduction(self, *args, **kwargs):
         return self._summy_funcs(ReductionSummarizer, *args, **kwargs)
 
-    def _summy_funcs(self, summyCls, introduction, section, conclusion, summary_size):
+    def _summy_funcs(self, summyCls, text, summary_size):
         sentences = summyCls()(PlaintextParser.from_string(
-            ". ".join(introduction + section + conclusion), STokenizer("english")).document, summary_size
-        )[:summary_size]
+            text, STokenizer("english")).document, summary_size
+        )
+        return [s._text for s in sentences]
         return " ".join([s._text for s in sentences]).split(". ")
+
+
+    def summarize_item(self, item, method="kl", summary_size=5):
+        summ_f = getattr(self, f"_summ_{method}")
+        if not summ_f: 
+            raise Exception("can't support [{method}]")
+
+        if method in ["kl", "lsa", "luhn", "reduction", "textrank", "lexrank"]:
+            
+            text = " ".join(preprocess_section(item.introduction + item.section + item.conclusion))
+            
+            return summ_f(text, summary_size), None
+
+
 
     def summ_item(self, item, info="chi2", method="centroid", summary_size=5):
         summ_f = getattr(self, f"_summ_{method}")
@@ -216,8 +224,8 @@ class Summarizer:
             [item.introduction, item.section, item.conclusion])
 
         if method in ["kl", "lsa", "luhn", "reduction"]:
-            return summ_f(introduction, section, conclusion, 
-                        summary_size=summary_size)
+            return summ_f(" ".join(introduction + section + conclusion), 
+                        summary_size=summary_size), None
 
         info_f = getattr(self._info_F, f"{info}_f")
         if not info_f:
@@ -226,13 +234,13 @@ class Summarizer:
         _input = Input(introduction + section + conclusion,
             [1]*len(introduction) + [0]*len(section) + [1]*len(conclusion))
         
-        token_importance = info_f(_input)
+        token_importance = dict(info_f(_input))
         # abstract = " ".join(preprocess_section(item.abstract))
 
         summary = summ_f(introduction, section, conclusion,
-                            dict(token_importance), summary_size=summary_size)
+                            token_importance, summary_size=summary_size)
 
-        return summary
+        return summary, token_importance
 
     def summ_items(self, items, *args, **kwargs):
         """
@@ -330,6 +338,7 @@ class InfoF:
         """
         X = self.vectorizer.fit_transform(inputs.data)
 
+        # TODO: 越高的独立值，互相依赖性越高，试试负号
         gi_ = mutual_info_classif(X, inputs.target, discrete_features=True)
 
         return zip(self.vectorizer.get_feature_names(), gi_)
@@ -375,3 +384,192 @@ class InfoF:
         weights_ = np.random.random(len(self.vectorizer.get_feature_names()))
 
         return zip(self.vectorizer.get_feature_names(), weights_)
+
+    
+
+
+
+class SLNSummarize:
+    def __init__(self):
+        self.define_link()
+
+
+    def define_link(self):
+        LINK = namedtuple("LINK", ["name", "clue_words"])
+
+        TEMPORAL = LINK("TEMPORAL_LINK", ["before", "after", "overlap", "when", "during"])
+        CAUSE_EFFECT = LINK("CE_LINK", ["because", "since", "so", "lead to", "therefore", "thus", "hence"])
+        PURPORSE = LINK("PURPOSE_LINK", ["for", "to", "in order to", "so that"])
+        MEANS = LINK("MEANS_LINK", ["by", "through"])
+        CONDITION = LINK("CONDITION_LINK", ["if", "only if", "only when"])
+        SEQUENTIAL = LINK("SEQUENTIAL_LINK", ["and", "also", "or", "then"])
+        OWN = LINK("OWN_LINK", ["of", "belong to"])
+
+        self.clueWord_to_link = {}
+        for link in [TEMPORAL, CAUSE_EFFECT, PURPORSE, MEANS, CONDITION, SEQUENTIAL, OWN]:
+            for clueWord in link.clue_words:
+                self.clueWord_to_link[clueWord] = link.name
+        self.clue_words = sorted(self.clueWord_to_link.keys())
+
+    def extract_link(self, tokens):
+        phrases = []; tags = []
+        token_tags = nltk.pos_tag(tokens)
+        i = 0
+        while i < len(tokens):
+            for clue_word in self.clue_words:
+                if " ".join(tokens[i:]).startswith(clue_word):
+                    i += len(clue_word.split(" "))
+                    phrases.append(clue_word)
+                    tags.append("SLN-LINK")
+                    break
+            else:
+                phrases.append(tokens[i])
+                tags.append(token_tags[i][1])
+                i += 1
+
+        return list(zip(phrases, tags))
+
+
+    def keep(self, tag):
+        if tag[:2] in ["VB", "NN", "JJ", "RB"]: return True
+        return False
+        # not 保留
+        # 动词, 名词, 形容词, 副词
+        if tag[:2] in ["VB", "NN", "JJ", "RB"]: return True
+        # 所有格： you, your
+        if tag[:3] == "PRP": return True
+
+        # 情态动词
+        if tag[:2] in ["MD"]: return False
+        return False
+    
+    def test2(self, sentences, token_importance, mmr=True, summary_size=5):
+        summarys = []
+
+        for sentence in sentences:
+            summary = ""; score = 0
+            for i, (token, tag) in enumerate(self.extract_link(sentence.split(" "))):
+                if tag == "SLN-LINK" or self.keep(tag):
+                    summary += token + " "
+                    score += 1 if tag == "SLN-LINK" else token_importance.get(token, 0)
+            summarys.append((summary, score))
+            
+        return sorted(summarys, key=lambda x: x[1], reverse=True)
+    
+    def __call__(self, sentences, token_importance, mmr=True, summary_size=5):
+        from copy import deepcopy
+        token_importance = deepcopy(token_importance)
+
+        final_summarys = []
+        summary_words_set = set()
+
+        def get_sentence_score(sentence):
+            if not sentence: return ("", -1)
+            summary = ""; score = 0
+            for token, tag in nltk.pos_tag(sentence.strip().split(" ")):
+                if self.keep(tag) or (token not in summary_words_set):
+                    summary += f"{token} "
+                    score += token_importance.get(token, 0)
+                elif token in self.clue_words:
+                    summary += f"{token} "
+                    score += 1
+            
+            return summary, score
+
+
+        while len(final_summarys) < summary_size + 2:
+            sentences = list(map(lambda x: x[0],
+                sorted(map(get_sentence_score, sentences), key=lambda x: x[1], reverse=True)
+            ))
+
+            summary = sentences[0]
+            sentences = sentences[1:]
+            final_summarys.append(summary)
+
+            for token in summary.split(" "):
+                summary_words_set.update(token)
+                token_importance[token] =  token_importance.get(token, 0) / 4
+
+            for sentence in sentences:
+                for token in sentence.split(" "):
+                    if token in summary.split(" "):
+                        for token in sentence.split(" "):
+                            token_importance[token] = token_importance.get(token, 0) * 2
+                        break
+
+        return [". ".join(final_summarys)]
+
+        return [". ".join(
+            list(map(lambda x: x[0],
+                sorted(map(get_sentence_score, sentences), key=lambda x: x[1], reverse=True)
+            ))[:summary_size]
+            )]
+
+        # 加入mmr算法
+        final_summarys = []
+        summary_words_set = set()
+
+        while len(final_summarys) < summary_size:
+
+            sentences = []
+            
+            summarys = []
+            for sentence in sentences:
+                if not sentence: continue
+
+                summary = ""; score = 0
+                for i, (token, tag) in enumerate(self.extract_link(sentence.split(" "))):
+                    if tag == "SLN-LINK" or self.keep(tag):
+                        summary += token + " "
+                        score += 1 if tag == "SLN-LINK" else token_importance.get(token, 0)
+                summarys.append((summary, score))
+            summary = sorted(summarys, key=lambda x: x[1], reverse=True)[0][0]
+
+            for token in summary.split(" "):
+                token_importance[token] = token_importance.get(token, 0) / 2
+                summary_words_set.update(token)
+
+            final_summarys.append(summary)
+
+        return [". ".join(final_summarys)]
+
+
+
+
+
+
+        
+
+        while len(final_summarys) < summary_size:
+            summarys = []
+
+            for sentence in sentences:
+                if not sentence: continue
+
+                summary = ""; score = 0
+                for i, (token, tag) in enumerate(self.extract_link(sentence.strip().split(" "))):
+                    if tag == "SLN-LINK" or self.keep(tag) or (token not in summary_words_set):
+                        summary += token + " "
+                        score += 1 if tag == "SLN-LINK" else token_importance.get(token, 0)
+                summarys.append((summary, score))
+            
+            summary = sorted(summarys, key=lambda x: x[1], reverse=True)[0][0]
+            for token in summary.split(" "):
+                token_importance[token] = token_importance.get(token, 0) / 4
+                summary_words_set.update(token)
+        
+            final_summarys.append(summary)
+            
+            sentences = list(map(lambda s: s[0], filter(lambda s: s[0] != summary and s[0].strip() != "", summarys)))
+            
+            summ_tokens = summary.split(" ")
+            for sentence in sentences:
+                for summ_token in summ_tokens:
+                    if summ_token in sentence.split(" "):
+                        for token in sentence.split(" "):
+                            if token not in summ_tokens:
+                                token_importance[token] = token_importance.get(token, 0) * 4
+                        break
+        
+        return [". ".join(final_summarys)]
+        

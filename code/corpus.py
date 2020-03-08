@@ -9,8 +9,11 @@
 @Desc    :   None
 '''
 
+from itertools import chain
 from lxml import etree
 from pathlib import Path
+from psumm import preprocess_section
+import re
 
 class Item:
     
@@ -32,7 +35,6 @@ class Item:
         pass
 
 
-
 class Corpus:
     # introduction 0.3, section 0.9, conclusion 1.0
     PORTION = [0.3, 0.9]
@@ -44,8 +46,8 @@ class Corpus:
         cnt = 0
         for item in map(self.build_item, self._files):
             if not isinstance(item, Item): continue
+            #if cnt == limit_size: break
             yield item
-            if cnt == limit_size: break
             cnt += 1
 
     def split_sentences(self, sentences, points=PORTION):
@@ -94,9 +96,10 @@ class Corpus:
 
 class CNN(Corpus):
 
+
     @property
     def _files(self):
-        return (self.base_path / "stories").glob("*.story")
+        return list((self.base_path / "story").glob("*.story"))
 
     def _split_story(self, file):
         content = file.read_text()
@@ -114,7 +117,7 @@ class CNN(Corpus):
 
         story_lines, hightlights = map(_pre_lines, self._split_story(file))
 
-        return Item("".join(hightlights), *self.split_sentences(story_lines))
+        return Item("".join(hightlights), *self.split_sentences(story_lines, [0.2, 0.9]))
 
 
 class Legal(Corpus):
@@ -124,12 +127,12 @@ class Legal(Corpus):
         file_names = map(lambda path: path.name, 
                         (self.base_path / "citations_summ").glob("*.xml"))
 
-        return map(lambda name: (self.base_path / "citations_summ" / name, 
+        return list(map(lambda name: (self.base_path / "citations_summ" / name, 
                                 self.base_path / "fulltext" / name),
-                    file_names)
+                    file_names))
 
     def build_item(self, files):
-        summ_tree, full_tree = map(lambda file: etree.HTML(file.read_text()), files)
+        summ_tree, full_tree = map(lambda file: etree.HTML(file.read_text(encoding="utf-8", errors="ignore")), files)
 
         summ_phrases = ". ".join(summ_tree.xpath("//citphrase//text()"))
         cite_phrases = ". ".join(full_tree.xpath("//catchphrase//text()"))
@@ -142,8 +145,8 @@ class SciSumm(Corpus):
 
     @property
     def _files(self):
-        return map(lambda path: list((path / "Reference_XML").glob("*.xml"))[0],
-            (self.base_path / "data/Training-Set-2019/Task2/From-ScisummNet-2019").iterdir())
+        return list(map(lambda path: list((path / "Reference_XML").glob("*.xml"))[0],
+            (self.base_path / "data/Training-Set-2019/Task2/From-ScisummNet-2019").iterdir()))
     
     def build_item(self, file):
         tree = etree.HTML(file.read_text())
@@ -183,12 +186,30 @@ class ACL2014(Corpus):
         file_names = map(lambda path: path.name,
             (self.base_path / "abstract").glob("*.txt"))
         
-        return map(lambda name: (self.base_path / "abstract" / name, 
+        return list(map(lambda name: (self.base_path / "abstract" / name, 
                         self.base_path / "content" / name), 
-            file_names)
+            file_names))
 
     def build_item(self, files):
         abstract, full = map(lambda file: file.read_text(), files)
         title, introduction, *sections, conclusion = full.split("\n")
 
         return Item(abstract, introduction, " ".join(sections), conclusion)
+
+class DUC2002(Corpus):
+    
+    @property
+    def _files(self):
+        return [
+            # 每个doc有1/2个abstract，选择第一个作为ground truth，100个词
+            (list((self.base_path / "evaluation_results" / "abstracts" / "phase1" / "SEEmodels" / 
+                "SEE.edited.abstracts.in.edus").glob(f'{file_name.parent.name[:-1].upper()}.P.100.*.{file_name.name}.html'))[0],
+            self.base_path / "docs" / file_name.parent.name / file_name.name,)
+        for file_name in chain(*[_dir.iterdir() for _dir in (self.base_path / "docs").iterdir()])
+        ]
+    
+    def build_item(self, file):
+        abstract_file, content_file = file
+        abstract = " ".join(etree.HTML(abstract_file.read_text()).xpath("//a[@id]/text()"))
+        content = "".join(etree.HTML(content_file.read_text()).xpath("//text//text()")).replace("   ", " ").strip()
+        return Item(abstract, *self.split_sentences(preprocess_section(content)))

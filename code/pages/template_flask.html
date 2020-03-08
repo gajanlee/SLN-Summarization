@@ -1,0 +1,104 @@
+
+<!DOCTYPE html>
+<html><head>
+<meta http-equiv="X-UA-Compatible" content="IE=9">
+<style type="text/css">
+</style>
+</head>
+<body>
+<div class="slide" name="slide" id="slideslideIface1"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="13.333333in" height="7.5in" pointer-events="none" viewBox="0 0 960 540" version="1.1">
+  <g text-rendering="geometricPrecision" pointer-events="painted" transform="scale(1,1)">
+<rect x="0" y="0" width="960" height="540" fill="#ffffff"></rect>
+<g transform="matrix(1, 0, 0, 1, 127.200012, 91.97503)">
+  <text font-family="Calibri Light" font-size="45pt" fill="#000000">
+<tspan x="0" y="167.172974" >The title of Passage</tspan>
+</text>
+</g>
+<g transform="matrix(1, 0, 0, 1, 127.200012, 287.225037)">
+  <text font-family="Calibri" font-size="18pt" fill="#000000">
+<tspan x="0" y="20.4691963" >Author: {author}</tspan>
+<tspan x="0" y="56.3892" >Keywords: {keywords}</tspan>
+</text>
+</g>
+</g>
+</svg></div>
+<div class="slide" name="slide" id="slideslideIface2"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="13.333333in" height="7.5in" pointer-events="none" viewBox="0 0 960 540" version="1.1">
+  <g text-rendering="geometricPrecision" pointer-events="painted" transform="scale(1,1)">
+<rect x="0" y="0" width="960" height="540" fill="#ffffff"></rect>
+<g transform="matrix(1, 0, 0, 1, 73.20001, 32.34999)">
+  <text font-family="Calibri Light" font-size="33pt" fill="#000000">
+<tspan x="0" y="62.35439" >Abstract</tspan>
+</text>
+</g>
+<g transform="matrix(1, 0, 0, 1, 73.20001, 147.349991)">
+  <text font-family="Arial" font-size="21.375pt" fill="#000000">
+
+  {% for abstract in abstracts%}
+<tspan x="0" y="{{ abstract.y }}" >•</tspan>
+    {% for sentence in abstract.sentences %}
+<tspan x="{{ sentence.x }}" y="{{ sentence.y }}" font-family="Calibri" font-size="21pt">{{ sentence.content }}</tspan>
+    {% endfor %}
+
+<tspan x="0" y="{{ abstract.y }}" >•</tspan>
+<tspan x="18" y="23.8807335" font-family="Calibri" font-size="21pt">{abstract_1}</tspan>
+<tspan x="18" y="23.8807335" font-family="Calibri" font-size="21pt">{abstract_1}</tspan>
+
+  {% endfor%}
+</text>
+</g>
+</g>
+</svg></div>
+<div class="slide" name="slide" id="slideslideIface3"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="13.333333in" height="7.5in" pointer-events="none" viewBox="0 0 960 540" version="1.1">
+  <g text-rendering="geometricPrecision" pointer-events="painted" transform="scale(1,1)">
+<rect x="0" y="0" width="960" height="540" fill="#ffffff"></rect>
+<g transform="matrix(1, 0, 0, 1, 73.20001, 32.34999)">
+  <text font-family="Calibri Light" font-size="33pt" fill="#000000">
+<tspan x="0" y="62.35439" >Summary</tspan>
+</text>
+</g>
+<g transform="matrix(1, 0, 0, 1, 73.20001, 147.349991)">
+  <text font-family="Arial" font-size="21.375pt" fill="#000000">
+
+  {% for summary in summarys %}
+<tspan x="summary.x" y="summary.y"" >•</tspan>
+    {% for sentence in summary.sentences %}
+<tspan x="{sentence.x}" y="{sentence.y}"  font-family="Calibri" font-size="21pt">{sentence.content}</tspan>
+    {% endfor %}
+  {% endfor %}
+
+<tspan x="0" y="23.8807335" >•</tspan>
+<tspan x="18" y="23.8807335"  font-family="Calibri" font-size="21pt">{summary_1}</tspan>
+<tspan x="0" y="64.1207352" >•</tspan>
+<tspan x="18" y="64.1207352"  font-family="Calibri" font-size="21pt">{summary_2}</tspan>
+<tspan x="0" y="104.360733" >•</tspan>
+<tspan x="18" y="104.360733"  font-family="Calibri" font-size="21pt">{summary_3}</tspan>
+<tspan x="0" y="144.360733" >•</tspan>
+<tspan x="18" y="144.360733"  font-family="Calibri" font-size="21pt">{summary_4}</tspan>
+<tspan x="0" y="184.360733" >•</tspan>
+<tspan x="18" y="184.360733"  font-family="Calibri" font-size="21pt">{summary_5}</tspan>
+
+
+</text>
+</g>
+</g>
+</svg></div>
+<div class="slide" name="slide" id="slideslideIface4"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="13.333333in" height="7.5in" pointer-events="none" viewBox="0 0 960 540" version="1.1">
+  <g text-rendering="geometricPrecision" pointer-events="painted" transform="scale(1,1)">
+<rect x="0" y="0" width="960" height="540" fill="#ffffff"></rect>
+<g transform="matrix(1, 0, 0, 1, 127.200012, 91.97503)">
+  <text font-family="Calibri Light" font-size="45pt" fill="#000000">
+<tspan x="0" y="167.172974" >Thank you!</tspan>
+</text>
+</g>
+<g transform="matrix(1, 0, 0, 1, 127.200012, 287.225037)">
+  <text font-family="Calibri" font-size="18pt" fill="#000000">
+<tspan x="0" y="20.4691963" >{date}</tspan>
+</text>
+</g>
+</g>
+</svg></div><div class="cnzz" style="display: none;">
+	        <script src="https://s23.cnzz.com/z_stat.php?id=1277655852&amp;web_id=1277655852" language="JavaScript"></script><script src="https://c.cnzz.com/core.php?web_id=1277655852&amp;t=z" charset="utf-8" type="text/javascript"></script><a href="https://www.cnzz.com/stat/website.php?web_id=1277655852" target="_blank" title="站长统计">站长统计</a>
+            </div>
+            
+            
+</body></html>
