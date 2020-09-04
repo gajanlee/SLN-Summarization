@@ -300,7 +300,24 @@ class InfoF:
 
     def __init__(self):
         self.vectorizer = CountVectorizer(lowercase=False)
+tokens = informative_tokens + detailed_tokens
+    all_counter = Counter(all_tokens)
+    informative_counter = Counter(informative_tokens)
+    detailed_counter = Counter(informative_tokens)
 
+    def _smi(token):
+        p_x_yi = informative_counter.get(token, 0) / len(informative_tokens)
+        p_x_yd = detailed_counter.get(token, 0) / len(detailed_tokens)
+
+        p_x = all_counter.get(token) / len(all_tokens)
+        p_yi = len(informative_tokens) / len(all_tokens)
+        p_yd = len(detailed_tokens) / len(all_tokens)
+
+        return p_x_yi * log(p_x_yi / (p_x * p_yi)) - lamda * p_x_yd * log(p_x_yd / (p_x * p_yd))
+
+    return {
+        token: _smi(token) for token in all_counter
+    }
     #` 摘要与正文之间的比较
     # 分类性能越好的词，即显著性越高，那么代表这个词越不重要
     def chi2_f(self, inputs):
