@@ -90,12 +90,13 @@ class SLN:
                             self.next()
 
                         link = word_link_mapper[word]
-                        if link == "Attribute" and (adj := self.current())[1] == "JJ":
-                            self.next()
-                            return [
-                                SemanticElement(link, word),
-                                SemanticElement("NODE", adj[0]),
-                            ]
+                        if link == "Attribute" and (adj := self.current()):
+                            if adj[1] == "JJ":
+                                self.next()
+                                return [
+                                    SemanticElement(link, word),
+                                    SemanticElement("NODE", adj[0]),
+                                ]
 
                         return SemanticElement(link, word)
             
@@ -219,15 +220,29 @@ def summarize(sentences, score_dict):
         max_indice = np.argmax(score_list)
         slns = slns[:max_indice] + slns[max_indice + 1:]
 
-        summary_slns.append(slns[max_indice])
+        selected_sln = slns[max_indice]
+        summary_slns.append(selected_sln)
 
-    return slns, summary_slns        
+        alpha = 1.5
+
+        for element in selected_sln.semantic_elements:
+            # Increase Diversity
+            for word in element.literal.split(" "):
+                score_dict[word] /= alpha
+            
+            # Increase Coherence
+            if element.literal in relations:
+                for element_literal in relations[element.literal]:
+                    for word in element_literal.split(" "):
+                        score_dict[word] *= alpha
+
+    return slns, summary_slns
 
 
 def normalize_node_text(node_text):
     return "_".join(node_text.split(" "))
 
-def slns_to_neo4j(slns, summary_slns):
+def slns_to_neo4j(slns, summary_slns, abstract_slns):
     relation_statements = []
 
     node_normalize_dict = {}
@@ -237,11 +252,13 @@ def slns_to_neo4j(slns, summary_slns):
             node_normalize_dict[from_node_id] = t.from_node
             node_normalize_dict[to_node_id] = t.to_node
             link = t.link.lower()
-            if link == "ACTION":
-                link = f"ACTION_{t.literal}"
+            if link == "action":
+                link = f"action_{t.literal}"
 
             statement = f"CREATE ({from_node_id})-[:{link}]->({to_node_id})"
             relation_statements.append(statement)
+    
+    relation_statements = list(set(relation_statements))
 
 
     node_statements = []
@@ -252,11 +269,24 @@ def slns_to_neo4j(slns, summary_slns):
             from_node_id, to_node_id = map(normalize_node_text, [t.from_node, t.to_node])
             summary_node_ids.update([from_node_id, to_node_id])
 
+    abstract_node_ids = set()
+    for s in abstract_slns:
+        for t in s.semantic_tuples:
+            from_node_id, to_node_id = map(normalize_node_text, [t.from_node, t.to_node])
+            abstract_node_ids.update([from_node_id, to_node_id])
+    
+    print(f"The overlap nodes count between summary and abstract is {len(abstract_node_ids & summary_node_ids)}")
+    print(f"The overlap nodes is {abstract_node_ids & summary_node_ids}")
+
     for node_id, node_text in node_normalize_dict.items():
-        if node_id not in summary_node_ids:
+        if node_id not in summary_node_ids and node_id not in abstract_node_ids:
             statement = f"CREATE ({node_id}:Node {{name: '{node_text}'}})"
-        else:
+        elif node_id in summary_node_ids and node_id not in abstract_node_ids:
             statement = f"CREATE ({node_id}:Summary {{name: '{node_text}'}})"
+        elif node_id not in summary_node_ids and node_id in abstract_node_ids:
+            statement = f"CREATE ({node_id}:Abstract {{name: '{node_text}'}})"
+        else:
+            statement = f"CREATE ({node_id}:Both {{name: '{node_text}'}})"
 
         node_statements.append(statement)
 

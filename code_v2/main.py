@@ -4,7 +4,7 @@ import string
 from itertools import chain
 from lxml import etree
 from pathlib import Path
-from sln import extract_relations_from_sentence, summarize, slns_to_neo4j
+from sln import extract_relations_from_sentence, summarize, slns_to_neo4j, SLN
 from nltk.stem import WordNetLemmatizer
 from word_scoring import smi
 lemmatizer = WordNetLemmatizer()
@@ -19,9 +19,8 @@ def segment_sentence(text):
     return nltk.sent_tokenize(text)
 
 
-def paper_corpus():
+def paper_corpus(file_name="147.P14-1087.xhtml.txt"):
     base_path = Path("/media/lee/辽东铁骑/数据集/acl2014/RST_summary/data/acl2014/")
-    file_name = "147.P14-1087.xhtml.txt"
     abstract = (base_path / "abstract" / file_name).read_text()
     introduction, *sections, conclusion = (base_path / "content" / file_name).read_text().split("\n")
 
@@ -44,9 +43,10 @@ def tokenize_sentences_and_words(text):
     return sentences
 
 
-if __name__ == "__main__":
-    abstract, introduction, section, conclusion = paper_corpus()
+def run(file_name):
+    abstract, introduction, section, conclusion = paper_corpus(file_name)
 
+    abstract_sentences_tokens = tokenize_sentences_and_words(abstract)
     introduction_sentences_tokens = tokenize_sentences_and_words(introduction)
     section_sentences_tokens = tokenize_sentences_and_words(section)
     conclusion_sentences_tokens = tokenize_sentences_and_words(conclusion)
@@ -60,8 +60,13 @@ if __name__ == "__main__":
         introduction_sentences_tokens + section_sentences_tokens + conclusion_sentences_tokens,
         score_dict,
     )
+    abstract_slns = []
+    for sentence_tokens in abstract_sentences_tokens:
+        s = SLN(sentence_tokens)
+        s.construct()
+        abstract_slns.append(s)
 
-    node_statements, relation_statements = slns_to_neo4j(whole_slns, summary_slns)
+    node_statements, relation_statements = slns_to_neo4j(whole_slns, summary_slns, abstract_slns)
 
     Path("./neo4j.txt").write_text(
         "\n".join([
@@ -83,3 +88,11 @@ if __name__ == "__main__":
 
     # relations = extract_relations_from_sentence(sentences)
     # print(len(relations))
+
+
+if __name__ == "__main__":
+    run("100.P14-2103.xhtml.txt")
+    # for file_path in Path("/media/lee/辽东铁骑/数据集/acl2014/RST_summary/data/acl2014/abstract").glob("*"):
+    #     name = file_path.name
+    #     print(name)
+    #     run(name)
