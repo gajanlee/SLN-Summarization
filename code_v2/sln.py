@@ -151,11 +151,15 @@ class SLN:
                 continue
             
             if element.element_type == "NODE":
-                if from_node:
+                if from_node and links:
                     for link in links:
                         tuples.append(SemanticTuple(from_node, element.literal, link[0], link[1]))
+                elif from_node:
+                    tuples.append(SemanticTuple(from_node, element.literal, "SEQUENTIAL", ""))
+
                 from_node = element.literal
                 links = []
+                    
             else:
                 links.append((element.element_type, element.literal))
 
@@ -192,15 +196,17 @@ def extract_relations_from_sentence(sentences):
 
 def summarize(sentences, score_dict):
     summary_slns = []
+    summary_sentences = []
 
     slns = []
     for sentence_words in sentences:
         s = SLN(sentence_words)
         s.construct()
         slns.append(s)
+    whole_slns = slns
     relations = extract_relations_from_sentence(sentences)
 
-    for _ in range(5):
+    for _ in range(10):
         score_list = []
         for s in slns:
             score = 0
@@ -218,10 +224,13 @@ def summarize(sentences, score_dict):
             score_list.append(score)
 
         max_indice = np.argmax(score_list)
-        slns = slns[:max_indice] + slns[max_indice + 1:]
 
         selected_sln = slns[max_indice]
         summary_slns.append(selected_sln)
+        summary_sentences.append(sentences[max_indice])
+
+        slns = slns[:max_indice] + slns[max_indice + 1:]
+        sentences = sentences[:max_indice] + sentences[max_indice + 1:]
 
         alpha = 1.5
 
@@ -236,13 +245,45 @@ def summarize(sentences, score_dict):
                     for word in element_literal.split(" "):
                         score_dict[word] *= alpha
 
-    return slns, summary_slns
+    return whole_slns, summary_slns, summary_sentences
 
 
 def normalize_node_text(node_text):
     return "_".join(node_text.split(" "))
 
-def slns_to_neo4j(slns, summary_slns, abstract_slns):
+
+def slns_to_neo4j(slns, node_tag):
+    relation_statements = []
+    node_normalize_dict = {}
+    for s in slns:
+        for t in s.semantic_tuples:
+            from_node_id, to_node_id = map(normalize_node_text, [t.from_node, t.to_node])
+            node_normalize_dict[from_node_id] = t.from_node
+            node_normalize_dict[to_node_id] = t.to_node
+            link = t.link.lower()
+            if link == "action":
+                link = f"action_{t.literal}"
+
+            statement = f"CREATE ({from_node_id})-[:{link}]->({to_node_id})"
+            relation_statements.append(statement)
+    
+    relation_statements = list(set(relation_statements))
+
+    node_statements = []
+    node_ids = set()
+    for s in slns:
+        for t in s.semantic_tuples:
+            from_node_id, to_node_id = map(normalize_node_text, [t.from_node, t.to_node])
+            node_ids.update([from_node_id, to_node_id])
+
+    for node_id, node_text in node_normalize_dict.items():
+        statement = f"CREATE ({node_id}:{node_tag} {{name: '{node_text}'}})"
+        node_statements.append(statement)
+
+    return node_statements, relation_statements
+
+
+def summarization_slns_to_neo4j(slns, summary_slns, abstract_slns):
     relation_statements = []
 
     node_normalize_dict = {}
@@ -260,7 +301,6 @@ def slns_to_neo4j(slns, summary_slns, abstract_slns):
     
     relation_statements = list(set(relation_statements))
 
-
     node_statements = []
 
     summary_node_ids = set()
@@ -277,6 +317,8 @@ def slns_to_neo4j(slns, summary_slns, abstract_slns):
     
     print(f"The overlap nodes count between summary and abstract is {len(abstract_node_ids & summary_node_ids)}")
     print(f"The overlap nodes is {abstract_node_ids & summary_node_ids}")
+    # print(f"The summary nodes count is {len(summary_node_ids)}")
+    # print(f"The summary nodes count is {len(summary_node_ids & set(node_normalize_dict.keys()))}")
 
     for node_id, node_text in node_normalize_dict.items():
         if node_id not in summary_node_ids and node_id not in abstract_node_ids:

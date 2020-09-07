@@ -21,16 +21,20 @@ def test_part_of_link():
 def test_attribute_link():
     return ["Jack", "is", "good"]
 
+def test_seperate_noun_link():
+    return ["data", "from", "dbpedia", "to", "label", "topic"]
+
 
 if __name__ == "__main__":
     for test_fn in [
-        test_action_link,
-        test_situation_link_verb,
-        test_situation_link_noun,
-        test_cause_effect_link,
-        test_multi_relation_link,
-        test_part_of_link,  # part 是个名词，调整next指针顺序，在外部next.
-        test_attribute_link,    # 系动词后接形容词
+        # test_action_link,
+        # test_situation_link_verb,
+        # test_situation_link_noun,
+        # test_cause_effect_link,
+        # test_multi_relation_link,
+        # test_part_of_link,  # part 是个名词，调整next指针顺序，在外部next.
+        # test_attribute_link,    # 系动词后接形容词
+        test_seperate_noun_link,
     ]:
         words = test_fn()
         s = SLN(words)
