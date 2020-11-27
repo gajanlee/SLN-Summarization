@@ -2,7 +2,6 @@ import nltk
 import numpy as np
 from collections import namedtuple
 
-
 SemanticElement = namedtuple("SemanticElement", ["element_type", "literal"])
 SemanticTuple = namedtuple("SemanticTuple", ["from_node", "to_node", "link", "literal"])
 
@@ -53,16 +52,18 @@ class SLN:
 
     def identify_clue_words(self):
         link_word_mapper = {
-            "Attribute": ["am", "is", "are", "feel", "sound"],
-            "Sequential": ["and", "then", "or", "as well as"],
-            "Condition": ["if", "onlyif", "when", "unless"],
+            "NODE": ["I", "you", "he", "we", "they", "she", "It", "him"],
+            "negative": ["not", "don't", "isn't", "is not", "not", "do not"],
+            "Attribute": ["am", "is", "are", "feel", "sound", "hear", "keep", "remain", "look", "smell", "become", "grow", "fall", "get", "go", "come"],
+            "Sequential": ["and", "then", "or", "as well as", "beside", "besides", "except"],
+            "Condition": ["if", "only if", "when", "unless", "while"],
             "Cause_effect": ["because", "because of", "so", "therefore", "thus", "lead to", "due to", "insight to", "in view of", "in consideration of", "be responsible for", "be attributable to", "result in"],
-            # "Effect-cause": [],
-            "Part_of": ["kind of", "part of"],
+            "temporal": ["second", "minute", "hour", "day", "year", "month", "before", "after", "same time", "time"],
+            "Part_of": ["kind of", "part of", "part", "kind", "such as", "subclass", "child"],
             "Similar": ["similar to", "like", "same as", "resemblance to", "resemble", "comprable with"],
             "Purpose": ["for", "to", "in order to", "aim to", "so as to"],
-            "Means": ["by", "through", "via"],
-            "Own": ["of"],
+            "Means": ["by", "through", "via", "use", "make use of"],
+            "Own": ["of", "'s", "his", "their", "own", "her", "our", "your", "have", "has", "had"],
             "Situation": ["in", "at"],
         }
 

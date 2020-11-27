@@ -1,5 +1,10 @@
 import math
 from collections import Counter
+from functools import partial
+from pathlib import Path
+from tqdm import tqdm
+from itertools import chain
+from pathlib import Path
 
 log = lambda x: 0 if x == 0 else math.log(x)
 
@@ -18,13 +23,23 @@ def smi(informative_tokens, detailed_tokens, lamda=0.3, normalize=True, debug=Fa
         p_yi = len(informative_tokens) / len(all_tokens)
         p_yd = len(detailed_tokens) / len(all_tokens)
 
+        if p_x == 0 or p_yi == 0 or p_yd == 0:
+            return 0
+
         return p_x_yi * log(p_x_yi / (p_x * p_yi)) - lamda * p_x_yd * log(p_x_yd / (p_x * p_yd))
 
     score_dict = {
         token: _smi(token) for token in all_counter
     }
     if normalize:
+        if not score_dict:
+            return score_dict
+
         max_score, min_score = max(score_dict.values()), min(score_dict.values())
+
+        if max_score == min_score:
+            return score_dict
+
         score_dict = {
             token: (value - min_score) / (max_score - min_score)
             for token, value in score_dict.items()
@@ -37,6 +52,45 @@ def smi(informative_tokens, detailed_tokens, lamda=0.3, normalize=True, debug=Fa
         print(len(informative_tokens), len(detailed_tokens), len(all_tokens))
 
     return score_dict
+
+pmi = partial(smi, lamda=-1)
+
+def dsmi(informative_tokens, detailed_tokens, lamda=0.3):
+    all_tokens = informative_tokens + detailed_tokens
+    all_counter = Counter(all_tokens)
+    smi_dict = smi(informative_tokens, detailed_tokens, lamda=lamda)
+    return {
+        token: all_counter.get(token) * smi_dict.get(token) for token in all_tokens
+    }
+    
+
+
+
+def tf(tokens):
+    return Counter(tokens)
+
+bbc_idf_dict = None
+def init_idf_dict():
+    global bbc_idf_dict
+    from tokenizer import tokenize_sentences_and_words
+    token_occurrence = {}
+    for file_path in tqdm(Path(r"F:/codes/summarization/data/bbc-news/bbc news summary/Summaries/politics").glob("*.txt"), desc="bbc idf calculation"):
+        text = file_path.read_text()
+        for token in set(chain(*tokenize_sentences_and_words(text))):
+            token_occurrence[token] = token_occurrence.get(token, 0) + 1
+
+    for token in token_occurrence:
+        token_occurrence[token] = 1 / token_occurrence[token]
+    bbc_idf_dict = token_occurrence
+
+def tf_idf(tokens):
+    global bbc_idf_dict
+    if not bbc_idf_dict:
+        init_idf_dict()
+    token_counter = Counter(tokens)
+    return {
+        token: token_counter.get(token) * bbc_idf_dict.get(token, 0) for token in tokens
+    }
 
 
 def test_smi():
