@@ -1,0 +1,5 @@
+word_scoring="tf,smi,tf_idf,pmi"
+summarization="w/o coherence, w/o simplification, w/o "
+rouge-1
+rouge-2
+rouge-l
