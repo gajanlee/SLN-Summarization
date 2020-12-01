@@ -49,6 +49,10 @@ class SLN:
         action_word = self.current()[0]
         self.next()
         return SemanticElement("ACTION", action_word)
+    
+
+    def apply_reasoning(self):
+        pass
 
     def identify_clue_words(self):
         link_word_mapper = {
@@ -125,7 +129,6 @@ class SLN:
         
         return elements
 
-    
     def current(self):
         if self.curr_index >= len(self.word_pos_tags):
             return None
@@ -142,7 +145,6 @@ class SLN:
         if self.curr_index + offset >= len(self.word_pos_tags):
             return None
         return self.word_pos_tags[self.curr_index + offset]
-
 
     def construct_tuples(self, elements):
         from_node, links = "", []
