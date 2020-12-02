@@ -5,7 +5,6 @@ from collections import namedtuple
 SemanticElement = namedtuple("SemanticElement", ["element_type", "literal"])
 SemanticTuple = namedtuple("SemanticTuple", ["from_node", "to_node", "link", "literal"])
 
-
 class SLN:
 
     def __init__(self, words):
@@ -50,9 +49,11 @@ class SLN:
         self.next()
         return SemanticElement("ACTION", action_word)
     
-
     def apply_reasoning(self):
+        """推理的结果会让度增加，从而影响节点的评分和摘要结果
+        """
         pass
+
 
     def identify_clue_words(self):
         link_word_mapper = {

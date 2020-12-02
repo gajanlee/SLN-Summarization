@@ -1,9 +1,10 @@
 from copy import deepcopy
+from sln import SLN
 
-def SLN_summarizer(sentences, word_score_dict, strategies=[], desired_length=150):
-    assert len(SLNs) == len(sentences)
-
+def SLN_summarizer(sentences, word_score_dict, strategies=[], desired_length=150, threshold=0.3, decay_rate=0.5):
     SLNs = [SLN(sentence) for sentence in sentences]
+    for sln in SLNs:
+        sln.construct()
     summary_sentences = []
 
     while sum(len(sentence) for sentence in summary_sentences) < desired_length:
@@ -14,28 +15,28 @@ def SLN_summarizer(sentences, word_score_dict, strategies=[], desired_length=150
         if "concise" in strategies:
             generated_sentence = simplify_sentence(generated_sentence, word_score_dict, threshold)
 
-        check_equivalence(SLN(simplified_sentence), SLNs[index])
+        check_equivalence(SLN(generated_sentence), SLNs[index])
         # 调整重新设置阈值的策略
         if "diverse" in strategies:
-            word_score_dict = decrease_redundancy(selected_sentence, SLNs[index], word_score_dict, decay_rate)
+            word_score_dict = decrease_redundancy(generated_sentence, SLNs[index], word_score_dict, decay_rate)
 
         if "coherent" in strategies:
-            word_score_dict = increase_coherence(selected_sentence, SLNs, word_score_dict, decay_rate)
+            word_score_dict = increase_coherence(generated_sentence, SLNs, word_score_dict, decay_rate)
 
         summary_sentences.append(generated_sentence)
         sentences = sentences[:index] + sentences[index+1:]
-        
     
+    return summary_sentences
 
 def select_sentence(sentences, SLNs, word_score_dict):
     """
     return the index of most informative sentence
     """
     index_score_list = []
-    for index, sentence, SLN in enumerate(zip(sentences, SLNs)):
+    for index, (sentence, SLN) in enumerate(zip(sentences, SLNs)):
         sentence_score = 0
         for element in SLN.semantic_elements:
-            node_score = sum(word_score_dict[word] for word in element.split(" "))
+            node_score = sum(word_score_dict[word] for word in element.literal.split(" "))
             sentence_score += node_score
         index_score_list.append((index, sentence))
     

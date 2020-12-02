@@ -3,7 +3,7 @@ from pathlib import Path
 from tqdm import tqdm
 
 PAPER_BASE_PATH = Path("F:/数据集/acl2014/RST_summary/data/acl2014/")
-CNN_BASE_PATH = Path("F:/codes/summarization/data/cnn")
+CNN_BASE_PATH = Path("E:/codes/summarization/data/cnn")
 LEGAL_BASE_PATH = Path("F:/codes/summarization/data/corpus")
 
 def split_sentences(sentences, points):

@@ -32,9 +32,6 @@ def stat_sln_items(items):
     return {
         link: count / len(items) for link, count in dict(counter).items()
     }
-        
-        
-
 
 if __name__ == "__main__":
     # items = read_paper_corpus() # + read_cnn_corpus() + read_legal_corpus()
