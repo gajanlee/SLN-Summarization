@@ -42,7 +42,6 @@ if __name__ == "__main__":
         "legal": read_legal_corpus(139),
         "acl": read_paper_corpus(),
     }.items():
-
         result[name] = stat_sln_items(items)
     
     print(result)

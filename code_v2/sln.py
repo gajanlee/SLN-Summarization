@@ -7,10 +7,13 @@ SemanticTuple = namedtuple("SemanticTuple", ["from_node", "to_node", "link", "li
 
 class SLN:
 
-    def __init__(self, words):
+    def __init__(self, words, construct=False):
         self.words = words
         self.word_pos_tags = nltk.pos_tag(words)
         self.curr_index = 0
+
+        if construct:
+            self.construct()
 
     def construct(self):
         self.elements = self.identify_semantic_elements()
@@ -163,7 +166,7 @@ class SLN:
 
                 from_node = element.literal
                 links = []
-                    
+
             else:
                 links.append((element.element_type, element.literal))
 
@@ -171,7 +174,6 @@ class SLN:
             for link in links:
                 tuples.append(SemanticTuple(from_node, from_node, link[0], link[1]))
         return tuples
-
 
 def merge_sln_tuples(slns):
     merged_semantic_relations = {}
@@ -337,3 +339,20 @@ def summarization_slns_to_neo4j(slns, summary_slns, abstract_slns):
         node_statements.append(statement)
 
     return node_statements, relation_statements
+
+
+def is_node(ele: SemanticElement):
+    return ele.element_type == "NODE"
+
+def connected_nodes(ele: SemanticElement, slns):
+    nodes = set()
+    for s in slns:
+        for t in s.semantic_tuples:
+            if ele.literal in t.from_node:
+                nodes.add(t.to_node)
+            elif ele.literal in t.to_node:
+                nodes.add(t.to_node)
+    return list(nodes)
+
+def connected_links(ele: SemanticElement, sln: SLN):
+    pass
