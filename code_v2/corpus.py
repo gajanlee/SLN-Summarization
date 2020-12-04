@@ -2,9 +2,9 @@ from lxml import etree
 from pathlib import Path
 from tqdm import tqdm
 
-PAPER_BASE_PATH = Path("F:/数据集/acl2014/RST_summary/data/acl2014/")
+PAPER_BASE_PATH = Path("E:/数据集/acl2014/RST_summary/data/acl2014/")
 CNN_BASE_PATH = Path("E:/codes/summarization/data/cnn")
-LEGAL_BASE_PATH = Path("F:/codes/summarization/data/corpus")
+LEGAL_BASE_PATH = Path("E:/codes/summarization/data/corpus")
 
 def split_sentences(sentences, points):
     if len(points) <= 0: return sentences
@@ -55,7 +55,7 @@ def read_cnn(file_path):
     story_lines = [line[9:] if line.startswith("(CNN) -- ") else line for line in story_lines]
     highlight_lines = [line[9:] if line.startswith("(CNN) -- ") else line for line in highlight_lines]
 
-    return " ".join(highlight_lines), *split_sentences(story_lines, [0.5, 0.99])
+    return ". ".join(highlight_lines), *split_sentences(story_lines, [0.5, 0.99])
 
 def read_legal_corpus(limit=3000):
     base_path = LEGAL_BASE_PATH
