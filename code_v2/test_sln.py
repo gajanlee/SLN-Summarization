@@ -1,4 +1,4 @@
-from sln import SLN
+from sln_constructor import *
 
 def test_action_link():
     return ["Jack", "creates", "a", "big", "machine"]
@@ -73,8 +73,7 @@ if __name__ == "__main__":
         test_own_link2,
     ]:
         words = test_fn()
-        s = SLN(words)
-        s.construct()
-        print(test_fn.__name__)
-        s.print_semantic_tuples()
-        print( words, "=>", s.semantic_elements, "\n")
+        sln = make_sln_noun_verb_prep(words)
+        print(words)
+        print(sln)
+        print()

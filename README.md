@@ -86,7 +86,14 @@ A summarization algorithm based Semantic Link Network.
 
 ### TODO
 
-- [ ] 首先把所有子
+* 12月8日工作
+    1. sln_constructor.py 中把代词识别出来成为Node
+    2. 修复bug，link作为开头的情形
+    3. 合并make_sln_noun_xxxx，抽取公共函数，用candidate_link_names控制哪些链接可以引入
+        * action, passive, negative, co-occur, attribute, temporal作为基本的链接，永远都要生成
+    - [x] 修改test，抽取成code_v3，按照youdao note的目录写一个
+    5. 引入推理规则
+    6. 周三生成neo4j的图片，多层次，是否带推理
 
 ### Evaluation Step 2
 
