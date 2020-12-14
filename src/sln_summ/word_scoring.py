@@ -1,3 +1,4 @@
+import json
 import math
 from collections import Counter
 from functools import partial
@@ -5,9 +6,10 @@ from pathlib import Path
 from tqdm import tqdm
 from itertools import chain
 from pathlib import Path
+from sln_summ.corpus import read_bbc_file_paths
+from sln_summ.tokenizer import tokenize_sentences_and_words
 
 log = lambda x: 0 if x == 0 else math.log(x)
-
 
 def smi(informative_tokens, detailed_tokens, lamda=0.3, normalize=True, debug=False):
     all_tokens = informative_tokens + detailed_tokens
@@ -55,7 +57,7 @@ def smi(informative_tokens, detailed_tokens, lamda=0.3, normalize=True, debug=Fa
 
 pmi = partial(smi, lamda=-1)
 
-def dsmi(informative_tokens, detailed_tokens, lamda=0.3):
+def centroid_smi(informative_tokens, detailed_tokens, lamda=0.3):
     all_tokens = informative_tokens + detailed_tokens
     all_counter = Counter(all_tokens)
     smi_dict = smi(informative_tokens, detailed_tokens, lamda=lamda)
@@ -63,22 +65,15 @@ def dsmi(informative_tokens, detailed_tokens, lamda=0.3):
         token: all_counter.get(token) * smi_dict.get(token) for token in all_tokens
     }
     
-
-
-
 def tf(tokens):
     return Counter(tokens)
 
 bbc_idf_dict = None
 def init_idf_dict():
     global bbc_idf_dict
-    from tokenizer import tokenize_sentences_and_words
     token_occurrence = {}
 
-    import json
-    config = json.load(open("corpus.json"))
-
-    for file_path in tqdm(Path(config["bbc_corpus"]).glob("*.txt"), desc="bbc idf calculation"):
+    for file_path in tqdm(read_bbc_file_paths(), desc="bbc idf calculation"):
         text = file_path.read_text()
         for token in set(chain(*tokenize_sentences_and_words(text))):
             token_occurrence[token] = token_occurrence.get(token, 0) + 1

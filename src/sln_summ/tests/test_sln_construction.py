@@ -1,6 +1,27 @@
 from sln_summ.sln_construction import *
 
-def test_make_sln_noun_verb():
+def test_make_sln_noun_verb_pronoun():
+    cases = [
+        (
+            "it smells the flower and a bird which danced in the window",
+            SLN([
+                ("it", SemanticLink(ACTION_LINK_NAME, "smells"), "flower"),
+                ("flower", SemanticLink(CO_OCCUR_LINK_NAME, ""), "bird"),
+                ("bird", SemanticLink(ACTION_LINK_NAME, "danced"), "window"),
+            ]),
+        ),
+        (
+            "it is at Paris",
+            SLN([
+                ("it", SemanticLink(ATTRIBUTE_LINK_NAME, "is"), "Paris"),
+            ]),
+        ),
+    ]
+
+    for sentence, expected in cases:
+        assert make_sln_noun_verb_pronoun(sentence.split(" ")) == expected
+
+def test_make_sln_noun_verb_pronoun_rich():
     cases = [
         (
             "Jack smells the flower and a bird which danced in the window",
@@ -28,12 +49,18 @@ def test_make_sln_noun_verb():
                 ("Jack", SemanticLink(ATTRIBUTE_LINK_NAME, "is"), "good"),
             ]),
         ),
+        (
+            "foot mark in the sand",
+            SLN([
+                ("foot mark", SemanticLink(CO_OCCUR_LINK_NAME, ""), "sand"),
+            ]),
+        ),
     ]
 
     for sentence, expected in cases:
-        assert make_sln_noun_verb(sentence.split(" ")) == expected
+        assert make_sln_noun_verb_pronoun_rich(sentence.split(" ")) == expected
 
-def test_make_sln_noun_verb_pronoun():
+def test_make_sln_noun_verb_pronoun_prep():
     cases = [
         (
             "Jack smells the flower and a bird which danced in the window",
@@ -54,9 +81,9 @@ def test_make_sln_noun_verb_pronoun():
     ]
 
     for sentence, expected in cases:
-        assert make_sln_noun_verb_pronoun(sentence.split(" ")) == expected
+        assert make_sln_noun_verb_pronoun_prep(sentence.split(" ")) == expected
 
-def test_make_sln_noun_verb_pronoun_adj():
+def test_make_sln_noun_verb_pronoun_prep_adj():
     cases = [
         (
             "Jack is a good man",
@@ -68,10 +95,17 @@ def test_make_sln_noun_verb_pronoun_adj():
     ]
 
     for sentence, expected in cases:
-        assert make_sln_noun_verb_pronoun_adj(sentence.split(" ")) == expected
+        assert make_sln_noun_verb_pronoun_prep_adj_adv(sentence.split(" ")) == expected
 
-def test_make_sln_noun_verb_pronoun_adj_adv():
+def test_make_sln_noun_verb_pronoun_prep_adj_adv():
     cases = [
+        (
+            "Jack is good boy",
+            SLN([
+                ("Jack", SemanticLink(ATTRIBUTE_LINK_NAME, "is"), "good boy"),
+                ("good boy", SemanticLink(PART_OF_LINK_NAME, ""), "boy"),
+            ]),
+        ),
         (
             "Jack is a very good man",
             SLN([
@@ -87,6 +121,13 @@ def test_make_sln_noun_verb_pronoun_adj_adv():
             SLN([
                 ("Jack", SemanticLink(ATTRIBUTE_LINK_NAME, "is"), "very good"),
                 ("very good", SemanticLink(PART_OF_LINK_NAME, ""), "good"),
+            ]),
+        ),
+        (
+            "Jack is away to school",
+            SLN([
+                ("Jack", SemanticLink(ATTRIBUTE_LINK_NAME, "is"), "away"),
+                ("away", SemanticLink(PURPOSE_LINK_NAME, "to"), "school"),
             ]),
         ),
         (
@@ -173,7 +214,7 @@ def test_make_sln_noun_verb_pronoun_adj_adv():
     ]
 
     for sentence, expected in cases:
-        assert make_sln_noun_verb_pronoun_adj_adv(sentence.split(" ")) == expected
+        assert make_sln_noun_verb_pronoun_prep_adj_adv(sentence.split(" ")) == expected
 
 def test_sln_equal():
     cases = [
@@ -217,3 +258,24 @@ def test_sln_merge():
 
     for sln_1, sln_2, merged_sln in cases:
         assert sln_1 + sln_2 == merged_sln
+
+def test_sln_reasoning():
+    cases = [
+        (
+            SLN([
+                ("car", SemanticLink(MEANS_LINK_NAME, "use"), "engine"),
+                ("engine", SemanticLink(ACTION_LINK_NAME, "run"), "gas"),
+                ("engine", SemanticLink(MEANS_LINK_NAME, "by"), "gas"),
+            ], reasoning=True),
+            SLN([
+                ("car", SemanticLink(MEANS_LINK_NAME, "use"), "engine"),
+                ("car", SemanticLink(ACTION_LINK_NAME, "run"), "gas"),
+                ("car", SemanticLink(MEANS_LINK_NAME, "by"), "gas"),
+                ("engine", SemanticLink(ACTION_LINK_NAME, "run"), "gas"),
+                ("engine", SemanticLink(MEANS_LINK_NAME, "by"), "gas"),
+            ])
+        )
+    ]
+
+    for original_sln, reasoned_sln in cases:
+        assert original_sln == reasoned_sln

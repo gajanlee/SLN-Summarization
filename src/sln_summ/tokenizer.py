@@ -19,15 +19,16 @@ digits = "1234567890"
 def segment_sentence(text):
     return nltk.sent_tokenize(text)
 
-def tokenize_sentences_and_words(text, remove_stop=True):
+def tokenize_sentences_and_words(text, remove_stop=True, lower=False):
+    if lower: text = text.lower()
     sentences = []
-    for sentence_ in nltk.sent_tokenize(text.lower().replace(".", ". ")):
+    for sentence_ in nltk.sent_tokenize(text.replace(".", ". ")):
         # sentence = sentence.lower().replace(".", ". ")
         sentence = re.sub(f"[{symbols+digits}]", " ", sentence_)
         sentence = "".join([char for char in sentence if 0 < ord(char) < 128])
         words = nltk.word_tokenize(sentence)
         words = list(map(lemmatizer.lemmatize, words))
-        words = [word for word in words if len(word) > 1]
+        # words = [word for word in words if len(word) > 1]
         
         if remove_stop:
             words = [word for word in words if word not in stopwords]

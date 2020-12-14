@@ -86,7 +86,7 @@ A summarization algorithm based Semantic Link Network.
 
 ### TODO
 
-* 12月8日工作
+- [x] 12月8日工作
     1. sln_constructor.py 中把代词识别出来成为Node
     2. 修复bug，link作为开头的情形
     3. 合并make_sln_noun_xxxx，抽取公共函数，用candidate_link_names控制哪些链接可以引入
@@ -94,6 +94,9 @@ A summarization algorithm based Semantic Link Network.
     - [x] 修改test，抽取成code_v3，按照youdao note的目录写一个
     5. 引入推理规则
     6. 周三生成neo4j的图片，多层次，是否带推理
+- [ ] SMI_experiment 调参
+- [ ] read_xxx_corpus: return (text, (informative, detailed))
+
 
 ### Evaluation Step 2
 
@@ -106,3 +109,16 @@ paper-corpus: 173it [00:00, 2845.16it/s]
 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 10/10 [00:20<00:00,  2.07s/it] 
 {'rouge-1': {'f': 1.3748283895955316, 'p': 0.9332229929408208, 'r': 2.824372020724842}, 'rouge-2': {'f': 0.1892139366430468, 'p': 0.1305372794984323, 'r': 0.3730502284747524}, 'rouge-l': {'f': 1.3925806625590027, 'p': 1.0105235053068644, 'r': 2.3262352110201685}} 9
 ```
+
+
+好的摘要的特点应该符合
+1. 与原文语义一致
+2. 简洁
+3. 连贯
+4. 多样的特点
+从SLN的观察上来看，好的摘要应该是完整的一个图，并且比较分散，包含更多的实体，核心词具有更高的中心度。但是代词可能会影响到联通度的判断，所以摘要中应尽量减少代词的出现。
+我设计的摘要算法也是从这几点出发，对每个点基于SLN设计方法来生成摘要。
+
+# Reference
+
+* [TextTeaser](https://github.com/IndigoResearch/textteaser)

@@ -1,11 +1,11 @@
 import pyrouge
+import rouge
 import os
 import shutil
 import codecs
 import logging
 
-
-def rouge_perl(ref, hyp, log_name):
+def rouge_perl(ref, hyp, log_dir):
     """Compute the Rouge score based ROUGE-Toolkits 1.5.5
     
     params:
@@ -15,7 +15,7 @@ def rouge_perl(ref, hyp, log_name):
     """
 
     assert len(ref) == len(hyp)
-    log_dir = f"result/{log_name}/"
+    # log_dir = f"result/{log_name}/"
 
     if os.path.exists(log_dir):
         shutil.rmtree(log_dir)
@@ -74,3 +74,19 @@ def rouge_perl(ref, hyp, log_name):
         f.write("F_measure: %s Recall: %s Precision: %s\n"
               % (str(f_score), str(recall), str(precision)))
     return f_score[:], recall[:], precision[:]
+
+def rouge_score(reference, hypothesis):
+    """
+    reference: truth
+    hypothesis: summary
+
+    return: {
+        "rouge-1": {"p": 1.0, "r": 1.0, "f": s}
+        "rouge-2": ...,
+        "rouge-l": ...,
+    }
+    """
+
+    rouge_model = rouge.Rouge()
+    scores = rouge_model.get_scores(hypothesis, reference)
+    return scores[0]

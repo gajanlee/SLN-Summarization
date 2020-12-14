@@ -3,7 +3,7 @@ from pathlib import Path
 from tqdm import tqdm
 import json
 
-config = json.load(open("corpus.json"))
+config = json.load(open((Path(__file__)).parent / "../required_data/config.json"))["corpus"]
 
 PAPER_BASE_PATH = Path(config["paper_corpus"])
 CNN_BASE_PATH = Path(config["cnn_corpus"])
@@ -26,6 +26,10 @@ def split_sentences(sentences, points):
         sentence_group.append(sentences[pre_point:after_point])
 
     return map(lambda lines: "".join(lines), sentence_group)
+
+
+def read_bbc_file_paths():
+    return list(Path(config["bbc_corpus"]).glob("*.txt"))
 
 def read_paper_corpus(limit=50):
     base_path = PAPER_BASE_PATH
@@ -61,7 +65,7 @@ def read_cnn(file_path):
     story_lines = [line[9:] if line.startswith("(CNN) -- ") else line for line in story_lines]
     highlight_lines = [line[9:] if line.startswith("(CNN) -- ") else line for line in highlight_lines]
 
-    return ". ".join(highlight_lines), *split_sentences(story_lines, [0.5, 0.99])
+    return ". ".join(highlight_lines), *split_sentences(story_lines, [0.3, 0.99])
 
 def read_legal_corpus(limit=3000):
     base_path = LEGAL_BASE_PATH

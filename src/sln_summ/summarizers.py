@@ -1,88 +1,168 @@
-from copy import deepcopy
-from sln import *
+import copy
+import itertools
+# import sln_summ.tokenizer
+# from sln_summ.sln_construction import make_sln_noun_verb_pronoun_prep_adj_adv as make_sln
+from sln_summ.sln_construction import SLN, get_node_tokens, get_link_tokens
 
-def SLN_summarizer(sentences, word_score_dict, strategies=[], desired_length=150, threshold=0.3, decay_rate=0.5):
-    SLNs = [SLN(sentence) for sentence in sentences]
-    for sln in SLNs:
-        sln.construct()
+def sln_summarize(slns, sentences, word_score_dict, strategies, score_threshold=0.3, decay_rate=0.5, desired_length=150):
+    """
+    strategies = {
+        "completeness": {
+            "sentence_normalized": True
+        },
+        "simplification": {
+            "score_threshold": 0.3,
+        },
+        "conciseness": {},
+        "diversity": {},
+        "
+    }
+    """
     summary_sentences = []
 
-    score_iteration_list = [deepcopy(word_score_dict)]
+    merged_SLN = sum(slns, start=SLN([]))
+    while sum(len(sentence) for sentence in summary_sentences) < desired_length:
+        index = select_sentence(sentences, slns, word_score_dict)
+
+    score_iteration_list = [copy.deepcopy(word_score_dict)]
 
     while sum(len(sentence) for sentence in summary_sentences) < desired_length:
-        index = select_sentence(sentences, SLNs, word_score_dict)
-        if index == False:
-            break
+        index = select_sentence(sentences, slns, word_score_dict)
+        candidate_sentence = sentences[index]
 
-        generated_sentence = sentences[index]
-
-        if "concise" in strategies:
-            generated_sentence = simplify_sentence(generated_sentence, word_score_dict, threshold)
-
-        check_equivalence(SLN(generated_sentence, construct=True), SLNs[index])
-        # 调整重新设置阈值的策略
-        if "diverse" in strategies:
-            word_score_dict = decrease_redundancy(SLNs[index], word_score_dict, decay_rate)
+        if "simplification" in strategies:
+            kept_word_set = {word for word, score in word_score_dict.item() if score >= score_threshold}
+            simplify_sentence(candidate_sentence, kept_word_set)
+        
+            # check_equivalence(SLN(generated_sentence, construct=True), SLNs[index])
+            # 调整重新设置阈值的策略
+            # continue
+        
+        if "diversity" in strategies:
+            word_score_dict = decrease_redundancy(slns[index], word_score_dict, decay_rate)
 
         if "coherent" in strategies:
-            word_score_dict = increase_coherence(SLN(generated_sentence, construct=True), SLNs, word_score_dict, decay_rate)
+            word_score_dict = increase_coherence(slns[index], merged_SLN, word_score_dict, decay_rate)
 
-        summary_sentences.append(generated_sentence)
         sentences = sentences[:index] + sentences[index+1:]
+        slns = slns[:index] + slns[index+1:]
 
-        score_iteration_list.append(deepcopy(word_score_dict))
+        summary_sentences.append(candidate_sentence)
+
+        # score dict post normalized
+        score_iteration_list.append(copy.deepcopy(word_score_dict))
 
     return summary_sentences, score_iteration_list
 
-def select_sentence(sentences, SLNs, word_score_dict):
+def select_sentence(sentences, slns, word_score_dict, sentence_normalized=True):
     """
     return the index of most informative sentence
     """
-    index_score_list = []
-    for index, (sentence, SLN) in enumerate(zip(sentences, SLNs)):
-        sentence_score = 0
-        if len(SLN.semantic_elements) == 0:
-            continue
-        for element in SLN.semantic_elements:
-            node_score = sum(word_score_dict[word] for word in element.literal.split(" "))
-            sentence_score += node_score
-        index_score_list.append((index, sentence_score / len(SLN.semantic_elements), sentence))
+    def get_SI_score(sln):
+        token_set = set()
+        for from_node, link, to_node in sln:
+            tokens = get_node_tokens(from_node) + get_link_tokens(link) + get_node_tokens(to_node)
+            token_set.update(tokens)
+        return sum(
+            word_score_dict[word] for word in token_set
+        )
+
+    sentence_scores = [
+        (index, get_SI_score(sln)) for index, sln in enumerate(slns) if (score := get_SI_score) != 0
+    ]
+
+    if sentence_normalized:
+        sentence_scores = [
+            (index, score / len(sentences[index])) for index, score in sentence_scores
+    ]
     
-    if len(index_score_list) == 0:
-        return False
+    sentence_scores = sorted(sentence_scores, key=lambda tp: tp[1], reverse=True)
 
-    # 尝试根据长度再次筛选句子
-    sorted_list = sorted(index_score_list, key=lambda t: t[1], reverse=True)
-    return sorted_list[0][0]
+    if len(sentence_scores) == 0:
+        raise ValueError("Error Input with non-sense sentences")
 
-def simplify_sentence(sentence, word_score_dict, threshold):
-    simplified_token_sequence = []
-    for word in sentence:
-        if word_score_dict.get(word) >= threshold:
-            simplified_token_sequence.append(word)
-    return  simplified_token_sequence
+    # return the index
+    return sentence_scores[0][0]
 
-def check_equivalence(SLN_1, SLN_2):
-    return True
-    return new_threshold
+def simplify_sentence(sentence, kept_word_set):
+    return [
+        word for word in sentence if word in kept_word_set
+    ]
 
-def decrease_redundancy(sln, word_score_dict, decay_rate=0.2):
-    word_score_dict = deepcopy(word_score_dict)
+def find_inequivalence_words(original_sln, simplified_sln):
+    if original_sln == simplified_sln: return True
 
-    for element in sln.semantic_elements:
-        if not is_node(element): continue
-        
-        for word in element.literal.split(" "):
-            word_score_dict[word] *= decay_rate
+    words = set()
+    for from_node, link, to_node in original_sln - simplified_sln:
+        words.update(get_link_tokens(link))
+        words.update(get_node_tokens(from_node) + get_node_tokens(to_node))
+    
+    return list(words)
+
+def decrease_redundancy(sln, word_score_dict, decay_rate):
+    word_score_dict = copy.deepcopy(word_score_dict)
+
+    for from_node, link, to_node in sln:
+        tokens = get_node_tokens(from_node) + get_link_tokens(link) + get_node_tokens(to_node)
+        for token in tokens:
+            word_score_dict[token] *= (1 - decay_rate)
+
+    return word_score_dict
+
+def increase_coherence(sln, merged_sln, word_score_dict, decay_rate):
+    word_score_dict = copy.deepcopy(word_score_dict)
+
+    selected_node_set = set()
+    for from_node, _, to_node in sln:
+        selected_node_set.add([from_node, to_node])
+
+    connected_token_set = set()
+    for node in selected_node_set:
+        connected_nodes = merged_sln.find_connected_nodes(node)
+        connected_links = merged_sln.find_connected_links(node)
+
+        connected_token_set.update(
+            itertools.chain(*(get_node_tokens(_node) for _node in connected_nodes))
+        )
+        connected_token_set.update(
+            itertools.chain(*(get_link_tokens(_link) for _link in connected_links))
+        )
+
+    for token in connected_token_set:
+        word_score_dict[token] /= decay_rate
 
     return word_score_dict
 
-def increase_coherence(selected_SLN, SLNs, word_score_dict, decay_rate=0.2):
-    word_score_dict = deepcopy(word_score_dict)
-    nodes = [ele for ele in selected_SLN.semantic_elements if is_node(ele)]
-    for node in nodes:
-        for cnode in connected_nodes(node, SLNs):
-            for word in cnode.split(" "):
-                word_score_dict[word] /= decay_rate
+def summarize_from_library(text, method, desired_length=150):
+    from sumy.parsers.plaintext import PlaintextParser
+    from sumy.summarizers.lsa import LsaSummarizer
+    from sumy.summarizers.kl import KLSummarizer
+    from sumy.summarizers.luhn import LuhnSummarizer
+    from sumy.summarizers.lex_rank import LexRankSummarizer
+    from sumy.summarizers.text_rank import TextRankSummarizer
+    from sumy.nlp.tokenizers import Tokenizer as STokenizer
+    from textteaser import TextTeaser
 
-    return word_score_dict
+    if method == "textteaser":
+        sentences = TextTeaser().summarize("", text)
+        return sentences
+
+    sentences = {
+        "luhn": LuhnSummarizer,
+        "lsa": LsaSummarizer,
+        "kl": KLSummarizer,
+        "lexrank": LexRankSummarizer,
+        "textrank": TextRankSummarizer,
+    }[method]()(
+        PlaintextParser.from_string(text, STokenizer("english")).document,
+        sentences_count=5,
+    )
+
+    return sentences
+
+    # sentences = tokenize_sentences_and_words(" ".join([s._text for s in sentences]), remove_stop=False)
+    # summary_sents = []
+    # while sum(len(summary_sent) for summary_sent in summary_sents) < desired_length and len(summary_sents) < len(sentences):
+    #     summary_sents.append(sentences[len(summary_sents)])
+
+    # return summary_sents
