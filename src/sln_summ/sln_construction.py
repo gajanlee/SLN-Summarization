@@ -61,7 +61,7 @@ class SemanticLink:
     
     def __repr__(self):
         return self.__str__()
-
+    
 def _self_reasoning(link_names):
     return dict(zip(link_names, link_names))
 
@@ -136,8 +136,7 @@ def is_link_name(name):
     return name in link_clue_words
 
 def get_node_tokens(node):
-    if not node: return []
-    return node.split(" ")
+    return node.split(" ") if node else []
 
 def get_link_tokens(link):
     # if literal := link.literal and link.link_name not in [
@@ -147,7 +146,7 @@ def get_link_tokens(link):
     # ]:
     #     return literal.split(" ")
     # return []
-    return link.literal.split(" ")
+    return link.literal.split(" ") if link.literal else []
     
 
 class SLN:
@@ -163,7 +162,7 @@ class SLN:
             self.apply_reasoning()
 
     def update_tuples(self, tuples):
-        self.tuples.extend(tuples)
+        filtered_tuples = []
         
         for from_node, link, to_node in tuples:
             if from_node == PLACEHOLDER_NODE_NAME and to_node == PLACEHOLDER_NODE_NAME:
@@ -172,7 +171,11 @@ class SLN:
             _from_node = from_node if from_node != PLACEHOLDER_NODE_NAME else to_node
             _to_node = to_node if to_node != PLACEHOLDER_NODE_NAME else from_node
 
+            from_node = _from_node
+            to_node = _to_node
+
             self.nodes.update([from_node, to_node])
+            filtered_tuples.append((from_node, link, to_node))
 
             if from_node not in self.outgoing_links:
                 self.outgoing_links[from_node] = {}
@@ -187,6 +190,8 @@ class SLN:
             if link not in self.outgoing_links[from_node][to_node]:
                 self.outgoing_links[from_node][to_node].append(link)
                 self.incoming_links[to_node][from_node].append(link)
+
+        self.tuples.extend(filtered_tuples)
 
     @property
     def link_count(self):
@@ -228,12 +233,18 @@ class SLN:
         return connected_node_set
 
     def find_connected_links(self, node):
-        connected_link_set = set()
+        """Return the connected links with input node, which may be replicated.
+        """
+        connected_link_set = []
         if node in self.outgoing_links:
-            connected_link_set.update(node.outgoing_links[node].values())
+            for links in self.outgoing_links[node].values():
+                connected_link_set.extend(links)
         
         if node in self.incoming_links:
-            connected_link_set.update(node.incoming_links[node].values())
+            for links in self.incoming_links[node].values():
+                connected_link_set.extend(links)
+        
+        return connected_link_set
     
     def __iter__(self):
         yield from self.tuples
@@ -464,9 +475,10 @@ def make_sln(words, candidate_link_names=None, funcs=None, verbose=False):
             to_node = ""
             appendix = []
         elif (i >= len(word_pos_tags) - 1 and appendix):
-            link = candidate_tuples[-1][1]
-            for app_link in appendix:
-                link.add_appendix(app_link)
+            if candidate_tuples:
+                link = candidate_tuples[-1][1]
+                for app_link in appendix:
+                    link.add_appendix(app_link)
 
         i += 1
 

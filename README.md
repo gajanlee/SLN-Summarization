@@ -95,7 +95,7 @@ A summarization algorithm based Semantic Link Network.
     5. 引入推理规则
     6. 周三生成neo4j的图片，多层次，是否带推理
 - [ ] SMI_experiment 调参
-- [ ] read_xxx_corpus: return (text, (informative, detailed))
+- [ ] read_xxx_corpus: return (abstract, text, informative, detailed)
 
 
 ### Evaluation Step 2

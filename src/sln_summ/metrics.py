@@ -22,13 +22,16 @@ def rouge_perl(ref, hyp, log_dir):
     os.makedirs(log_dir)
 
     for i in range(len(ref)):
-        with codecs.open(log_dir+"%06d_reference.txt" % i, 'w', 'utf-8') as f:
+        with codecs.open(log_dir / ("%06d_reference.txt" % i), 'w', 'utf-8') as f:
             #f.write(" ".join(ref[i]).replace(' ', ' ') + '\n')
             f.write("\n".join(ref[i]))
-        with codecs.open(log_dir+"%06d_candidate.txt" % i, 'w', 'utf-8') as f:
+        with codecs.open(log_dir / ("%06d_candidate.txt" % i), 'w', 'utf-8') as f:
             #f.write(" ".join(hyp[i]).replace(' ', ' ').replace('<unk>', 'UNK') + '\n')
             f.write("\n".join(hyp[i]))
+    
+    return rouge_perl_dir(log_dir)
 
+def rouge_perl_dir(log_dir):
     r = pyrouge.Rouge155()
     r.model_filename_pattern = '#ID#_reference.txt'
     r.system_filename_pattern = '(\d+)_candidate.txt'

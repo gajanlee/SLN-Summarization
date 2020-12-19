@@ -172,8 +172,10 @@ def test_make_sln_noun_verb_pronoun_prep_adj_adv():
         (
             "go to school by bus",
             SLN([
-                (PLACEHOLDER_NODE_NAME, SemanticLink(ACTION_LINK_NAME, "go"), "school"),
-                (PLACEHOLDER_NODE_NAME, SemanticLink(PURPOSE_LINK_NAME, "to"), "school"),
+                # (PLACEHOLDER_NODE_NAME, SemanticLink(ACTION_LINK_NAME, "go"), "school"),
+                ("school", SemanticLink(ACTION_LINK_NAME, "go"), "school"),
+                # (PLACEHOLDER_NODE_NAME, SemanticLink(PURPOSE_LINK_NAME, "to"), "school"),
+                ("school", SemanticLink(PURPOSE_LINK_NAME, "to"), "school"),
                 ("school", SemanticLink(MEANS_LINK_NAME, "by"), "bus"),
             ])
         ),

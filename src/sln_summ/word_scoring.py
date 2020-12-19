@@ -1,3 +1,4 @@
+import copy
 import json
 import math
 from collections import Counter
@@ -10,6 +11,18 @@ from sln_summ.corpus import read_bbc_file_paths
 from sln_summ.tokenizer import tokenize_sentences_and_words
 
 log = lambda x: 0 if x == 0 else math.log(x)
+
+def normalize_scoring_dict(score_dict):
+    score_dict = copy.deepcopy(score_dict)
+    max_score, min_score = max(score_dict.values()), min(score_dict.values())
+
+    if max_score == min_score:
+        return score_dict
+
+    for word in score_dict:
+        score_dict[word] = (score_dict[word] - min_score) / (max_score - min_score)
+    
+    return score_dict
 
 def smi(informative_tokens, detailed_tokens, lamda=0.3, normalize=True, debug=False):
     all_tokens = informative_tokens + detailed_tokens
@@ -86,6 +99,7 @@ def tf_idf(tokens):
     global bbc_idf_dict
     if not bbc_idf_dict:
         init_idf_dict()
+    tokens = list(tokens)
     token_counter = Counter(tokens)
     return {
         token: token_counter.get(token) * bbc_idf_dict.get(token, 0) for token in tokens

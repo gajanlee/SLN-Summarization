@@ -8,25 +8,6 @@ config = json.load(open((Path(__file__)).parent / "../required_data/config.json"
 PAPER_BASE_PATH = Path(config["paper_corpus"])
 CNN_BASE_PATH = Path(config["cnn_corpus"])
 LEGAL_BASE_PATH = Path(config["legal_corpus"])
-# PAPER_BASE_PATH = Path("E:/数据集/acl2014/RST_summary/data/acl2014/")
-# CNN_BASE_PATH = Path("E:/codes/summarization/data/cnn")
-# LEGAL_BASE_PATH = Path("E:/codes/summarization/data/corpus")
-
-def split_sentences(sentences, points):
-    if len(points) <= 0: return sentences
-    points.extend([0, 1])
-
-    points = sorted(set(points))
-
-    sentence_group = []
-    sentence_len = len(sentences)
-    for pre_point, after_point in zip(points[:-1], points[1:]):
-        pre_point, after_point = map(int, 
-            [sentence_len * pre_point, sentence_len * after_point])
-        sentence_group.append(sentences[pre_point:after_point])
-
-    return map(lambda lines: "".join(lines), sentence_group)
-
 
 def read_bbc_file_paths():
     return list(Path(config["bbc_corpus"]).glob("*.txt"))
@@ -41,8 +22,9 @@ def read_paper_corpus(limit=50):
 def read_paper(base_path, file_name="147.P14-1087.xhtml.txt"):
     abstract = (base_path / "abstract" / file_name).read_text(encoding="utf-8")
     introduction, *sections, conclusion = (base_path / "content" / file_name).read_text(encoding="utf-8").split("\n")
+    middle_text = ". ".join(sections)
 
-    return abstract, introduction, " ".join(sections), conclusion
+    return abstract, introduction + middle_text + conclusion, introduction + ". " + conclusion, middle_text 
 
 def read_cnn_corpus(limit=10000):
     base_path = CNN_BASE_PATH
@@ -65,9 +47,11 @@ def read_cnn(file_path):
     story_lines = [line[9:] if line.startswith("(CNN) -- ") else line for line in story_lines]
     highlight_lines = [line[9:] if line.startswith("(CNN) -- ") else line for line in highlight_lines]
 
-    return ". ".join(highlight_lines), *split_sentences(story_lines, [0.3, 0.99])
+    informative_cutoff = int(0.2 * len(story_lines))
 
-def read_legal_corpus(limit=3000):
+    return ". ".join(highlight_lines), ". ".join(story_lines), ". ".join(story_lines[:informative_cutoff]), ". ".join(story_lines[informative_cutoff+1:])
+
+def read_legal_corpus(limit=3000, *args, **kwargs):
     base_path = LEGAL_BASE_PATH
     items = []
 
@@ -75,19 +59,32 @@ def read_legal_corpus(limit=3000):
         items.append(read_legal(
             base_path / "citations_summ" / file_path.name,
             base_path / "fulltext" / file_path.name,
+            *args, **kwargs
         ))
     
     return items
 
-def read_legal(citation_path, fulltext_path):
+def read_legal(citation_path, fulltext_path, truth_selection="all"):
     summ_tree = etree.HTML(citation_path.read_text(encoding="utf-8", errors="ignore"))
     full_tree = etree.HTML(fulltext_path.read_text(encoding="utf-8", errors="ignore"))
 
     summ_phrases = ". ".join(summ_tree.xpath("//citphrase//text()"))
     cite_phrases = ". ".join(full_tree.xpath("//catchphrase//text()"))
     sentences = full_tree.xpath("//sentence//text()")[:-2]  # Irrelevant sentence to text
+    
+    informative_cutoff = int(len(sentences) * 0.1)
 
-    return f"{summ_phrases} {cite_phrases}", *split_sentences(sentences, [0.4, 0.8])
+    abstract = {
+        "summ": summ_phrases,
+        "cite": cite_phrases,
+        "all": summ_phrases + ". " + cite_phrases,
+    }[truth_selection]
+    return (
+        abstract,
+        " ".join(sentences),
+        " ".join(sentences[:informative_cutoff]),
+        " ".join(sentences[informative_cutoff + 1:]),
+    ) 
 
 if __name__ == "__main__":
     read_paper_corpus()

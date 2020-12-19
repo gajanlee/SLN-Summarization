@@ -1,11 +1,27 @@
 import copy
 import itertools
-# import sln_summ.tokenizer
-# from sln_summ.sln_construction import make_sln_noun_verb_pronoun_prep_adj_adv as make_sln
-from sln_summ.sln_construction import SLN, get_node_tokens, get_link_tokens
+from sln_summ.sln_construction import SLN, get_node_tokens, get_link_tokens, make_sln_noun_verb_pronoun_prep_adj_adv
+from sln_summ.word_scoring import normalize_scoring_dict
 
-def sln_summarize(slns, sentences, word_score_dict, strategies, score_threshold=0.3, decay_rate=0.5, desired_length=150):
+def truncate_summary_by_words(summary, desired_length=100):
+    truncated_summary = []
+    length = 0
+    for words in summary:
+        truncated_summary.append(words)
+        length += len(words)
+        if length > desired_length:
+            break
+    
+    return truncated_summary
+
+
+def sln_summarize(sentences, word_score_dict, strategies,
+                sentence_normalized=True,
+                make_sln_func=make_sln_noun_verb_pronoun_prep_adj_adv,
+                score_threshold=0.3, decay_rate=0.5, desired_length=150, verbose=False, call_back_fn=None):
     """
+    sentences = [[words], ...]
+    Expected:
     strategies = {
         "completeness": {
             "sentence_normalized": True
@@ -18,41 +34,76 @@ def sln_summarize(slns, sentences, word_score_dict, strategies, score_threshold=
         "
     }
     """
+    if verbose:
+        v_log = lambda *a: print(a)
+    else:
+        v_log = lambda *a: None
+
+    word_score_dict = normalize_scoring_dict(word_score_dict)
+    slns = [make_sln_func(sentence) for sentence in sentences]
+
     summary_sentences = []
-
+    score_iteration_list = [("init", copy.deepcopy(word_score_dict))]
     merged_SLN = sum(slns, start=SLN([]))
-    while sum(len(sentence) for sentence in summary_sentences) < desired_length:
-        index = select_sentence(sentences, slns, word_score_dict)
 
-    score_iteration_list = [copy.deepcopy(word_score_dict)]
-
-    while sum(len(sentence) for sentence in summary_sentences) < desired_length:
+    iteration_step = 1
+    while sentences and sum(len(sentence) for sentence in summary_sentences) < desired_length:
         index = select_sentence(sentences, slns, word_score_dict)
-        candidate_sentence = sentences[index]
+        candidate_words = sentences[index]
+
+        v_log(f"Step {iteration_step} Selection")
+        v_log(f"{index}th sentence: {candidate_words}")
 
         if "simplification" in strategies:
-            kept_word_set = {word for word, score in word_score_dict.item() if score >= score_threshold}
-            simplify_sentence(candidate_sentence, kept_word_set)
+            kept_word_set = {word for word, score in word_score_dict.items() if score >= score_threshold}
+            simplified_words = simplify_sentence(candidate_words, kept_word_set)
         
-            # check_equivalence(SLN(generated_sentence, construct=True), SLNs[index])
-            # 调整重新设置阈值的策略
-            # continue
+            # 删除了一些关键词以后导致SLN无法构造回去了
+            if len(ineq_words := find_inequivalence_words(
+                slns[index],
+                make_sln_func(simplified_words),
+            )) != 0:
+                for _word in candidate_words:
+                    word_score_dict[_word] = max(word_score_dict.get(_word, 0), score_threshold)
+                # for _word in ineq_words:
+                #     word_score_dict[_word] = max(word_score_dict.get(_word), score_threshold)
+                score_iteration_list.append(("simp", copy.deepcopy(word_score_dict)))
+
+                v_log(f"Step {iteration_step} Simplification Failed.")
+                v_log(f"{ineq_words} are set as score threshold {score_threshold}.")
+                v_log(simplified_words)
+
+                iteration_step += 1
+                continue
+            
+            candidate_words = simplified_words
+
+            v_log(f"Step {iteration_step} Simplification Passed.")
+            v_log(f"simplified_sentence is {candidate_words}")
         
         if "diversity" in strategies:
             word_score_dict = decrease_redundancy(slns[index], word_score_dict, decay_rate)
+            score_iteration_list.append(("div", copy.deepcopy(word_score_dict)))
+            v_log(f"Step {iteration_step} Diversity Passed.")
 
-        if "coherent" in strategies:
+        if "coherence" in strategies:
             word_score_dict = increase_coherence(slns[index], merged_SLN, word_score_dict, decay_rate)
+            score_iteration_list.append(("coh", copy.deepcopy(word_score_dict)))
+            v_log(f"Step {iteration_step} Coherence Passed.")
 
         sentences = sentences[:index] + sentences[index+1:]
         slns = slns[:index] + slns[index+1:]
 
-        summary_sentences.append(candidate_sentence)
+        summary_sentences.append(candidate_words)
 
-        # score dict post normalized
-        score_iteration_list.append(copy.deepcopy(word_score_dict))
+        # score dict post-normalization
+        word_score_dict = normalize_scoring_dict(word_score_dict)
 
-    return summary_sentences, score_iteration_list
+        iteration_step += 1
+    
+    summary_sentences = [" ".join(words) + "." for words in summary_sentences]
+
+    return "".join(summary_sentences)
 
 def select_sentence(sentences, slns, word_score_dict, sentence_normalized=True):
     """
@@ -63,9 +114,13 @@ def select_sentence(sentences, slns, word_score_dict, sentence_normalized=True):
         for from_node, link, to_node in sln:
             tokens = get_node_tokens(from_node) + get_link_tokens(link) + get_node_tokens(to_node)
             token_set.update(tokens)
-        return sum(
-            word_score_dict[word] for word in token_set
-        )
+        try:
+            return sum(
+                word_score_dict[word] for word in token_set)
+        except Exception as ex:
+            print(ex)
+            return sum(
+                word_score_dict.get(word, 0) for word in token_set)
 
     sentence_scores = [
         (index, get_SI_score(sln)) for index, sln in enumerate(slns) if (score := get_SI_score) != 0
@@ -74,7 +129,7 @@ def select_sentence(sentences, slns, word_score_dict, sentence_normalized=True):
     if sentence_normalized:
         sentence_scores = [
             (index, score / len(sentences[index])) for index, score in sentence_scores
-    ]
+        ]
     
     sentence_scores = sorted(sentence_scores, key=lambda tp: tp[1], reverse=True)
 
@@ -90,21 +145,29 @@ def simplify_sentence(sentence, kept_word_set):
     ]
 
 def find_inequivalence_words(original_sln, simplified_sln):
-    if original_sln == simplified_sln: return True
+    if original_sln == simplified_sln: 
+        return []
 
-    words = set()
-    for from_node, link, to_node in original_sln - simplified_sln:
-        words.update(get_link_tokens(link))
-        words.update(get_node_tokens(from_node) + get_node_tokens(to_node))
-    
-    return list(words)
+    original_word_set, simplified_word_set = set(), set()
+
+    for from_node, link, to_node in original_sln:
+        original_word_set.update(get_link_tokens(link) + get_node_tokens(from_node) + get_node_tokens(to_node))
+    for from_node, link, to_node in simplified_sln:
+        simplified_word_set.update(get_link_tokens(link) + get_node_tokens(from_node) + get_node_tokens(to_node))
+
+    return original_word_set - simplified_word_set
 
 def decrease_redundancy(sln, word_score_dict, decay_rate):
     word_score_dict = copy.deepcopy(word_score_dict)
 
+    tokens = set()
     for from_node, link, to_node in sln:
-        tokens = get_node_tokens(from_node) + get_link_tokens(link) + get_node_tokens(to_node)
-        for token in tokens:
+        tokens.update(
+            get_node_tokens(from_node) + get_link_tokens(link) + get_node_tokens(to_node)
+        )
+    
+    for token in tokens:
+        if token in word_score_dict:
             word_score_dict[token] *= (1 - decay_rate)
 
     return word_score_dict
@@ -113,8 +176,12 @@ def increase_coherence(sln, merged_sln, word_score_dict, decay_rate):
     word_score_dict = copy.deepcopy(word_score_dict)
 
     selected_node_set = set()
-    for from_node, _, to_node in sln:
-        selected_node_set.add([from_node, to_node])
+    selected_word_set = set()
+    for from_node, link, to_node in sln:
+        selected_node_set.update([from_node, to_node])
+        selected_word_set.update(
+            get_node_tokens(from_node) + get_link_tokens(link) + get_node_tokens(to_node)
+        )
 
     connected_token_set = set()
     for node in selected_node_set:
@@ -128,8 +195,9 @@ def increase_coherence(sln, merged_sln, word_score_dict, decay_rate):
             itertools.chain(*(get_link_tokens(_link) for _link in connected_links))
         )
 
-    for token in connected_token_set:
-        word_score_dict[token] /= decay_rate
+    for token in connected_token_set - selected_word_set:
+        if token in word_score_dict:
+            word_score_dict[token] /= 1 - decay_rate
 
     return word_score_dict
 
@@ -144,8 +212,8 @@ def summarize_from_library(text, method, desired_length=150):
     from textteaser import TextTeaser
 
     if method == "textteaser":
-        sentences = TextTeaser().summarize("", text)
-        return sentences
+        sentences = TextTeaser().summarize("title test", text)
+        return " ".join(sentences)
 
     sentences = {
         "luhn": LuhnSummarizer,
@@ -158,7 +226,7 @@ def summarize_from_library(text, method, desired_length=150):
         sentences_count=5,
     )
 
-    return sentences
+    return " ".join([s._text for s in sentences])
 
     # sentences = tokenize_sentences_and_words(" ".join([s._text for s in sentences]), remove_stop=False)
     # summary_sents = []

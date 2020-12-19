@@ -1,8 +1,8 @@
- {
-     "corpus": {
+{
+    "corpus": {
         "paper_corpus" : "/home/ubuntu/datasets/acl2014",
         "cnn_corpus" : "/home/ubuntu/datasets/cnn/stories",
         "legal_corpus" : "/home/ubuntu/datasets/corpus",
         "bbc_corpus": "/home/ubuntu/datasets/bbc/politics"
-     }
+    }
  }
