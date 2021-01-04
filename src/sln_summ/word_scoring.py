@@ -111,8 +111,17 @@ def test_smi():
         "georgia", "mayor", "assails", "governor's", "move", "to", "reopen", "beaches"
     ]
     detailed_tokens = "the tybee island city council voted to close the beaches on march 20 but georgia gov brian kemp issued a statewide shelter-in-place executive order which supersedes all local orders relating to coronavirus and also opened up the state's beaches".split(" ")
-    smi(informative_tokens, detailed_tokens, normalize=False)
+    score_dict = smi(informative_tokens, detailed_tokens, normalize=True, debug=True)
+    print(score_dict)
+
+def test_smi2():
+    from sln_summ.corpus import read_paper_corpus
+    import itertools
+
+    abstract, text, informative, detailed = read_paper_corpus()[0]
+    score_dict = smi(list(itertools.chain(*tokenize_sentences_and_words(informative))), list(itertools.chain(*tokenize_sentences_and_words(detailed))), normalize=True, debug=True)
+    print(score_dict)
 
 
 if __name__ == "__main__":
-    test_smi()
+    test_smi2()

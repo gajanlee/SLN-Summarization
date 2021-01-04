@@ -61,6 +61,9 @@ class SemanticLink:
     
     def __repr__(self):
         return self.__str__()
+
+    def __hash__(self):
+        return hash(self.link_name) ^ hash(self.literal)
     
 def _self_reasoning(link_names):
     return dict(zip(link_names, link_names))
@@ -95,6 +98,27 @@ transitive_reasoning_rules = {
         OWN_LINK_NAME: ATTRIBUTE_LINK_NAME,
     },
     SEQUENTIAL_LINK_NAME: _self_reasoning(set(link_clue_words.keys())),
+    CONDITION_LINK_NAME: {
+        SEQUENTIAL_LINK_NAME: CONDITION_LINK_NAME,
+        CONDITION_LINK_NAME: CONDITION_LINK_NAME,
+        SIMILAR_LINK_NAME: CONDITION_LINK_NAME,
+    },
+    CAUSE_EFFECT_LINK_NAME: {
+        NEGATIVE_LINK_NAME: CAUSE_EFFECT_LINK_NAME,
+        ATTRIBUTE_LINK_NAME: CAUSE_EFFECT_LINK_NAME,
+        SEQUENTIAL_LINK_NAME: CAUSE_EFFECT_LINK_NAME,
+        CAUSE_EFFECT_LINK_NAME: CAUSE_EFFECT_LINK_NAME,
+        PART_OF_LINK_NAME: PART_OF_LINK_NAME,
+        PURPOSE_LINK_NAME: PURPOSE_LINK_NAME,
+    },
+    EFFECT_CAUSE_LINK_NAME: {
+        NEGATIVE_LINK_NAME: EFFECT_CAUSE_LINK_NAME,
+        ATTRIBUTE_LINK_NAME: EFFECT_CAUSE_LINK_NAME,
+        SEQUENTIAL_LINK_NAME: EFFECT_CAUSE_LINK_NAME,
+        EFFECT_CAUSE_LINK_NAME: EFFECT_CAUSE_LINK_NAME,
+        PART_OF_LINK_NAME: PART_OF_LINK_NAME,
+        PURPOSE_LINK_NAME: PURPOSE_LINK_NAME,
+    },
     PART_OF_LINK_NAME: {
         **_self_reasoning(set(link_clue_words.keys()) - set([SEQUENTIAL_LINK_NAME])),
         **{SEQUENTIAL_LINK_NAME: PART_OF_LINK_NAME}
@@ -129,7 +153,8 @@ transitive_reasoning_rules = {
     SITUATION_LINK_NAME: {
         **_self_reasoning([NEGATIVE_LINK_NAME, ATTRIBUTE_LINK_NAME, SITUATION_LINK_NAME, PART_OF_LINK_NAME, SIMILAR_LINK_NAME, PURPOSE_LINK_NAME, MEANS_LINK_NAME, OWN_LINK_NAME, SITUATION_LINK_NAME]),
         **{NEGATIVE_LINK_NAME: NEGATIVE_LINK_NAME}
-    }
+    },
+    TEMPORAL_LINK_NAME: {},
 }
 
 def is_link_name(name):
@@ -151,17 +176,17 @@ def get_link_tokens(link):
 
 class SLN:
 
-    def __init__(self, tuples, reasoning=False):
+    def __init__(self, tuples, reasoning=False, decompose=False):
         self.nodes = set()
         self.outgoing_links, self.incoming_links = {}, {}
         self.tuples = []
 
-        self.update_tuples(tuples)
+        self.update_tuples(tuples, decompose)
 
         if reasoning:
             self.apply_reasoning()
 
-    def update_tuples(self, tuples):
+    def update_tuples(self, tuples, decompose=False):
         filtered_tuples = []
         
         for from_node, link, to_node in tuples:
@@ -174,6 +199,11 @@ class SLN:
             from_node = _from_node
             to_node = _to_node
 
+            if decompose==True:
+                decomposed_tuples = self._decompose_multi_literal_node(from_node) + self._decompose_multi_literal_node(to_node)
+                self.update_tuples(decomposed_tuples, decompose=True)
+
+            
             self.nodes.update([from_node, to_node])
             filtered_tuples.append((from_node, link, to_node))
 
@@ -183,15 +213,30 @@ class SLN:
                 self.incoming_links[to_node] = {}
 
             if to_node not in self.outgoing_links[from_node]:
-                self.outgoing_links[from_node][to_node] = []
+                self.outgoing_links[from_node][to_node] = set()
             if from_node not in self.incoming_links[to_node]:
-                self.incoming_links[to_node][from_node] = []
+                self.incoming_links[to_node][from_node] = set()
             
             if link not in self.outgoing_links[from_node][to_node]:
-                self.outgoing_links[from_node][to_node].append(link)
-                self.incoming_links[to_node][from_node].append(link)
+                self.outgoing_links[from_node][to_node].add(link)
+                self.incoming_links[to_node][from_node].add(link)
 
         self.tuples.extend(filtered_tuples)
+
+    def _decompose_multi_literal_node(self, node):
+        if len(tokens := node.split(" ")) == 1 or node in self.nodes: return []
+        self.nodes.add(node)
+        tuples = []
+
+        for index in range(len(tokens)-1):
+            tuples.append((tokens[index], SemanticLink(CO_OCCUR_LINK_NAME, ""), tokens[index+1]))
+            tuples.append((tokens[index], SemanticLink(PART_OF_LINK_NAME, ""), " ".join(tokens)))
+            if index != len(tokens) - 2:
+                tuples.append((tokens[index], SemanticLink(CO_OCCUR_LINK_NAME, ""), " ".join(tokens[index+1:])))
+            # tuples.append((tokens[index], SemanticLink(PART_OF_LINK_NAME, ""), " ".join(tokens[index:])))
+        print(tuples)
+        
+        return tuples
 
     @property
     def link_count(self):
@@ -282,7 +327,7 @@ class SLN:
     def __repr__(self):
         return self.__str__()
     
-    def to_neo4j_expression(self):
+    def to_neo4j_expression(self, node_tag_handler=None):
         def _get_node_hash(text):
             return text.replace(" ", "_")
             
@@ -294,10 +339,10 @@ class SLN:
             return string
 
         statements = []
-        for node in self.nodes:
+        for node in sorted(self.nodes, key=lambda node: len(self.outgoing_links.get(node, [])) + len(self.incoming_links.get(node, [])), reverse=True):
             if node == PLACEHOLDER_NODE_NAME: continue
             node_hash = _get_node_hash(node)
-            node_tag = "NODE"
+            node_tag = "NODE" if not node_tag_handler else node_tag_handler(node)
             statements.append(
                 f"CREATE ({node_hash}:{node_tag} {{name: '{node}'}})"
             )
@@ -395,7 +440,7 @@ def merge_neighbor_clue_words(word_pos_tags, link_words_mapper):
 
     return new_word_pos_tags
 
-def make_sln(words, candidate_link_names=None, funcs=None, verbose=False):
+def make_sln(words, candidate_link_names=None, funcs=None, verbose=False, decompose=False):
     funcs = funcs if funcs else []
     candidate_link_names = candidate_link_names if candidate_link_names else []
 
@@ -482,7 +527,7 @@ def make_sln(words, candidate_link_names=None, funcs=None, verbose=False):
 
         i += 1
 
-    return SLN(candidate_tuples)
+    return SLN(candidate_tuples, decompose=decompose)
 
 def make_sln_noun_verb_pronoun(words, additional_links=None, additional_funcs=None, *args, **kwargs):
     additional_links = additional_links if additional_links else []
@@ -553,3 +598,5 @@ def make_sln_noun_verb_pronoun_prep_adj_adv(words, *args, **kwargs):
                 return 0, [], "", [SemanticLink(CO_OCCUR_LINK_NAME, word)], []
 
     return make_sln_noun_verb_pronoun_prep_adj(words, [], [adv_adj_func], *args, **kwargs)
+
+

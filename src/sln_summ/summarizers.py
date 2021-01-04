@@ -18,7 +18,7 @@ def truncate_summary_by_words(summary, desired_length=100):
 def sln_summarize(sentences, word_score_dict, strategies,
                 sentence_normalized=True,
                 make_sln_func=make_sln_noun_verb_pronoun_prep_adj_adv,
-                score_threshold=0.3, decay_rate=0.5, desired_length=150, verbose=False, call_back_fn=None):
+                score_threshold=0.3, decay_rate=0.5, desired_length=150, verbose=False, score_iter_callback_fn=None):
     """
     sentences = [[words], ...]
     Expected:
@@ -41,7 +41,7 @@ def sln_summarize(sentences, word_score_dict, strategies,
 
     word_score_dict = normalize_scoring_dict(word_score_dict)
     slns = [make_sln_func(sentence) for sentence in sentences]
-
+    
     summary_sentences = []
     score_iteration_list = [("init", copy.deepcopy(word_score_dict))]
     merged_SLN = sum(slns, start=SLN([]))
@@ -102,8 +102,10 @@ def sln_summarize(sentences, word_score_dict, strategies,
         iteration_step += 1
     
     summary_sentences = [" ".join(words) + "." for words in summary_sentences]
+    if score_iter_callback_fn:
+        score_iter_callback_fn(score_iteration_list)
 
-    return "".join(summary_sentences)
+    return " ".join(summary_sentences)
 
 def select_sentence(sentences, slns, word_score_dict, sentence_normalized=True):
     """

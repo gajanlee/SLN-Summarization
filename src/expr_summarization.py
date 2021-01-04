@@ -60,7 +60,7 @@ def sln_summarization_items(items, score_approach, lamda, *args, **kwargs):
                 list(chain(*detailed_sentence_tokens)),
                 lamda=lamda
             )
-        kwargs["verbose"] = True
+        # kwargs["verbose"] = True
         summary = sln_summarize(sentences, score_dict, *args, **kwargs)
 
         summarys.append(summary)
@@ -78,19 +78,19 @@ def run_all_sln_summarzations(items, base_dir):
         ["simplification", "diversity", "coherence"],
         ["simplification"],
         ["diversity"],
-        ["coherence"]
+        ["coherence"],
     ]
-    sentence_normalized_alternatives = [True, False]
+    sentence_normalized_alternatives = [True]
     make_sln_funcs = [
         make_sln_noun_verb_pronoun_prep_adj_adv,
-        make_sln_noun_verb_pronoun,
-        make_sln_noun_verb_pronoun_rich,
-        make_sln_noun_verb_pronoun_prep,
-        make_sln_noun_verb_pronoun_prep_adj,
+        # make_sln_noun_verb_pronoun,
+        # make_sln_noun_verb_pronoun_rich,
+        # make_sln_noun_verb_pronoun_prep,
+        # make_sln_noun_verb_pronoun_prep_adj,
     ]
     score_thresholds = [0.3, 0.01, 0.1, 0.2, 0.5, 0.7, 0.9, 1.0]
     decay_rates = [0.3, 0.01, 0.1, 0.2, 0.5, 0.7, 0.9]
-    desired_lengths = [150, 50, 100, 120]
+    desired_lengths = [100, 50, 100, 120]
     lamdas = [0.3, -0.3, -0.5, -0.8, 0.1, 0.5, 0.8]
 
     summary_recorder = {}
@@ -100,8 +100,8 @@ def run_all_sln_summarzations(items, base_dir):
         score_approaches, strategies, sentence_normalized_alternatives,
         make_sln_funcs, score_thresholds, decay_rates, desired_lengths, lamdas
     )), desc="sln summarizing"):
-        key = f"{score_approach}_{'_'.join(strategy)}_{sentence_normalized}_{make_sln_func.__name__}_{score_threshold}_{decay_rate}_{desired_length}"
-        print(f"running {key} base_dir")
+        key = f"{score_approach}_{'_'.join(strategy)}_{sentence_normalized}_{make_sln_func.__name__}_{score_threshold}_{decay_rate}_{desired_length}_{lamda}"
+        print(f"running {key} to {base_dir}")
         if (base_dir / key).exists() and len(list((base_dir / key).glob("*"))) != 0:
             print(key, " exists")
             continue
@@ -113,18 +113,26 @@ def run_all_sln_summarzations(items, base_dir):
             decay_rate=decay_rate,
             desired_length=desired_length,))
 
+def run_tf_idf_summarizations(items, base_dir):
+    for method in ["tf", "idf"]:
+        key = f"{method}_100"
+        if (base_dir / key).exists() and len(list((base_dir / key).glob("*"))) != 0:
+            print(key, " exists")
+            continue
+        yield key, sln_summarization_items(items, method, 0.3, ["simplification", "diversity", "coherence"], True, make_sln_noun_verb_pronoun_prep_adj_adv, 0.3, 0.3, 100)
+
 if __name__ == "__main__":
     expr = sys.argv[1]
-    output_dir = Path("/home/ubuntu/SLN_Summarization_output")
+    output_dir = Path("/home/ubuntu/SLN_Summarization_output2")
     if (score_path := Path(f"./expr_summarization_{expr}.csv")).exists():
         score_csv = pd.read_csv(score_path)
     else:
         score_csv = pd.DataFrame()
 
     datasets = {
-        "paper": read_paper_corpus(200),
+        #"paper": read_paper_corpus(200),
         "cnn": read_cnn_corpus(200),
-        "legal": read_legal_corpus(50),
+        #"legal": read_legal_corpus(50),
     }
 
     for data_name, items in datasets.items():
@@ -133,9 +141,12 @@ if __name__ == "__main__":
             summary_iterator = run_all_library_summarizations(items, base_dir)
         elif expr == "sln":
             summary_iterator = run_all_sln_summarzations(items, base_dir)
+        elif expr == "tf_idf":
+            summary_iterator = run_tf_idf_summarizations(items, base_dir)
         
         for key, summarys in summary_iterator:
             abstracts = [tokenize_sentences_and_words(item[0], cut_words=False) for item in items]
+            summarys = [tokenize_sentences_and_words(summary, cut_words=False) for summary in summarys]
             
             _abstracts, _summarys = [], []
             for abstract, summary in zip(abstracts, summarys):
@@ -144,6 +155,8 @@ if __name__ == "__main__":
                     _summarys.append(summary)
             print(f"len abstracts {len(_abstracts)}, len summarys {len(_summarys)}")
             score = rouge_perl(_abstracts, _summarys, base_dir / key)
+
+            print(key, score)
 
             score_csv = score_csv.append({
                 "dataset": f"{data_name}/{len(items)}",
