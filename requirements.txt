@@ -1,5 +1,5 @@
 nltk==3.4.5
-lxml==4.5.0
+lxml==4.6.2
 rouge==0.3.2
 lexrank==0.1.0
 sklearn
